@@ -201,6 +201,97 @@ header{position:relative;z-index:50;flex-shrink:0;display:flex;align-items:cente
 .prompt-body{padding:18px;overflow:auto;white-space:pre-wrap;line-height:1.75;font-size:13px;color:var(--text);background:var(--bg4)}
 .prompt-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border);background:var(--bg3);flex-wrap:wrap}
 
+
+
+/* ===== Theme toggle: light mode ===== */
+body.light-mode{
+  --bg:#f4f7fb;
+  --bg2:#ffffff;
+  --bg3:#edf2f7;
+  --bg4:#f8fafc;
+  --text:#172033;
+  --text2:#64748b;
+  --muted:#7b8797;
+  --border:#d8e1ec;
+  --borderB:#b8c7d9;
+  --card:#ffffff;
+  --accent:#0284c7;
+  --accent2:#7c3aed;
+  background:#f4f7fb;
+  color:var(--text);
+}
+body.light-mode .topbar,
+body.light-mode .panel-head,
+body.light-mode .modal-head,
+body.light-mode .modal-actions,
+body.light-mode .report-head,
+body.light-mode .report-foot,
+body.light-mode .prompt-head,
+body.light-mode .prompt-foot{
+  background:#edf2f7;
+  border-color:#d8e1ec;
+}
+body.light-mode textarea,
+body.light-mode input,
+body.light-mode select{
+  background:#ffffff!important;
+  color:#172033!important;
+  border-color:#cbd5e1!important;
+}
+body.light-mode .card,
+body.light-mode .panel,
+body.light-mode .modal-box,
+body.light-mode .report-box,
+body.light-mode .prompt-box{
+  background:#ffffff;
+  border-color:#d8e1ec;
+  color:#172033;
+}
+body.light-mode .preview,
+body.light-mode .editor,
+body.light-mode .codebox,
+body.light-mode .report-body,
+body.light-mode .prompt-body{
+  background:#f8fafc!important;
+  color:#172033!important;
+}
+body.light-mode .grid-bg{
+  background-image:
+    linear-gradient(rgba(15,23,42,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,23,42,.045) 1px, transparent 1px)!important;
+}
+body.light-mode .btn{
+  background:#ffffff;
+  color:#172033;
+  border-color:#cbd5e1;
+}
+body.light-mode .btn:hover{
+  background:#f1f5f9;
+}
+body.light-mode .chip,
+body.light-mode .tab,
+body.light-mode .pill{
+  background:#e8eef7;
+  color:#334155;
+  border-color:#cbd5e1;
+}
+body.light-mode iframe{
+  background:#ffffff;
+}
+body.light-mode .empty,
+body.light-mode .muted,
+body.light-mode small{
+  color:#64748b!important;
+}
+body.light-mode .theme-toggle{
+  background:#ffffff;
+  border-color:#cbd5e1;
+  color:#172033;
+}
+.theme-toggle{
+  white-space:nowrap;
+}
+
 </style>
 </head>
 <body>
@@ -213,6 +304,7 @@ header{position:relative;z-index:50;flex-shrink:0;display:flex;align-items:cente
     <div class="nav-tabs">
       <button class="nav-tab active" id="ntab-runner" onclick="sp('runner',this)">&#9889; 실험 실행기</button>
       <button class="nav-tab" id="ntab-gallery" onclick="sp('gallery',this)">&#128300; 갤러리</button>
+<button class="btn theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="라이트모드로 전환">☀️ 라이트모드</button>
     </div>
     <button class="ham" onclick="toggleMob()">&#9776;</button>
     <div style="display:flex;align-items:center;gap:4px">
@@ -1177,6 +1269,35 @@ function showAiLog() {
     alert("AI 대화 기록을 불러오지 못했습니다: " + e.message);
   });
 }
+
+
+
+function applyTheme(mode) {
+  var isLight = mode === "light";
+  document.body.classList.toggle("light-mode", isLight);
+  try { localStorage.setItem("rp_theme", mode); } catch(e) {}
+
+  var btn = document.getElementById("theme-toggle");
+  if (btn) {
+    btn.textContent = isLight ? "🌙 다크모드" : "☀️ 라이트모드";
+    btn.title = isLight ? "다크모드로 전환" : "라이트모드로 전환";
+  }
+}
+
+function toggleTheme() {
+  var next = document.body.classList.contains("light-mode") ? "dark" : "light";
+  applyTheme(next);
+}
+
+(function initTheme() {
+  var saved = "dark";
+  try { saved = localStorage.getItem("rp_theme") || "dark"; } catch(e) {}
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function(){ applyTheme(saved); });
+  } else {
+    applyTheme(saved);
+  }
+})();
 
 </script>
 
