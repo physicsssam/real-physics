@@ -275,7 +275,7 @@ AI에게 이렇게 요청해보세요:
         </div>
         <div class="pv-inner">
           <div class="pv-ph" id="pvph"><div class="ei">&#9883;</div><p>코드를 입력하고<br>[&#9654; 실행]을 눌러주세요</p></div>
-          <iframe id="preview-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe>
+          <iframe id="preview-frame" sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups allow-downloads"></iframe>
         </div>
         <div class="pv-foot"><span style="font-family:var(--mono);font-size:10px;color:var(--text2);opacity:.3">sandbox &#183; 안전 실행 환경</span></div>
       </div>
@@ -367,12 +367,12 @@ AI에게 이렇게 요청해보세요:
 
 <div class="fsov" id="fsov">
   <div class="fsbar"><span>Real Physics &#8212; 전체화면</span><button class="btn" onclick="closeFs()">&#10005; 닫기 (ESC)</button></div>
-  <iframe id="fs-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe>
+  <iframe id="fs-frame" sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups allow-downloads"></iframe>
 </div>
 <div class="mbg" id="mbg" onclick="if(event.target===this)closeM()">
   <div class="modal">
     <div class="mhd"><div><div class="mttl" id="mttl"></div><div class="mmeta" id="mmeta"></div></div><button class="btn bdanger" style="font-size:10px" onclick="closeM()">&#10005;</button></div>
-    <div class="mbody"><iframe id="modal-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe></div>
+    <div class="mbody"><iframe id="modal-frame" sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups allow-downloads"></iframe></div>
     <div class="mft"><div style="flex:1;min-width:260px"><div class="mdesc" id="mdesc"></div><details class="report-details" id="report-wrap" style="display:none"><summary>제작 과정 보고서 보기</summary><div class="report-box" id="mreport"></div></details></div><div class="mac" id="mac"></div></div>
   </div>
 </div>
@@ -514,8 +514,39 @@ function adminLogout() {
 
 function setFrameSrcdoc(frame, code) {
   if (!frame) return;
-  frame.srcdoc = "";
-  setTimeout(function() { frame.srcdoc = code; }, 25);
+
+  // GitHub Pages 등 실제 웹주소 환경에서 srcdoc가 간헐적으로 비어 보이는 문제를 줄이기 위해
+  // Blob URL 방식으로 먼저 실행하고, 실패할 때만 srcdoc 방식으로 되돌립니다.
+  try {
+    if (frame._rpBlobUrl) {
+      URL.revokeObjectURL(frame._rpBlobUrl);
+      frame._rpBlobUrl = null;
+    }
+
+    var htmlCode = String(code || "");
+
+    // 기본 HTML 구조가 없어도 실행되도록 보정
+    if (!/<!doctype|<html[\s>]/i.test(htmlCode)) {
+      htmlCode = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" + htmlCode + "</body></html>";
+    }
+
+    var blob = new Blob([htmlCode], { type: "text/html;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    frame._rpBlobUrl = url;
+
+    frame.removeAttribute("srcdoc");
+    frame.src = "about:blank";
+
+    setTimeout(function() {
+      frame.src = url;
+    }, 30);
+  } catch (err) {
+    frame.src = "about:blank";
+    frame.srcdoc = "";
+    setTimeout(function() {
+      frame.srcdoc = String(code || "");
+    }, 30);
+  }
 }
 
 function runCode() {
