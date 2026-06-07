@@ -921,6 +921,220 @@ body.device-mobile .app{
   }
 }
 
+
+
+/* ===== Mobile compact utility row ===== */
+@media (max-width:768px){
+  .hright{
+    gap:6px!important;
+  }
+
+  /* 실험 실행기 / 갤러리는 첫 줄 */
+  .nav-tabs{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important;
+  }
+
+  .nav-tabs .theme-toggle{
+    grid-column:auto!important;
+  }
+
+  /* nav-tabs 안의 라이트/다크 버튼을 별도 utility row처럼 보이게 */
+  #theme-toggle{
+    order:3!important;
+    grid-column:1/-1!important;
+    display:none!important; /* 실제 버튼은 아래 모바일 유틸 줄에서 복제 느낌으로 배치 */
+  }
+
+  /* 기기 버튼 줄과 관리자 줄을 한 줄처럼 정렬 */
+  .hright > div[style*="display:flex;align-items:center;gap:4px"],
+  .hright > div[style*="display:flex;align-items:center;gap:6px"]{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:6px!important;
+    width:auto!important;
+  }
+
+  .hright > div[style*="display:flex;align-items:center;gap:4px"]{
+    order:2!important;
+  }
+
+  .hright > div[style*="display:flex;align-items:center;gap:6px"]{
+    order:2!important;
+  }
+
+  /* 두 줄로 나뉜 유틸 버튼 묶음을 한 줄 flex로 강제 */
+  .hright{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+  }
+
+  .hright::after{
+    content:"";
+    display:none;
+  }
+
+  /* 두 번째 줄 역할: 기기 버튼과 관리자 버튼을 오른쪽으로 붙이지 말고 한 줄에 압축 */
+  .hright > div:nth-of-type(2),
+  .hright > div:nth-of-type(3){
+    min-width:0!important;
+  }
+
+  .dbtn{
+    width:38px!important;
+    min-width:38px!important;
+    height:38px!important;
+    font-size:17px!important;
+    border-radius:11px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+  }
+
+  #dbtn-tablet{
+    font-size:24px!important;
+    font-weight:900!important;
+    line-height:1!important;
+  }
+
+  #admin-login-btn{
+    width:auto!important;
+    min-width:72px!important;
+    height:38px!important;
+    min-height:38px!important;
+    padding:0 10px!important;
+    font-size:11px!important;
+    white-space:nowrap!important;
+  }
+
+  #admin-badge{
+    min-height:38px!important;
+    padding:5px 8px!important;
+  }
+
+  /* 라이트/다크 버튼을 기기 버튼 줄 앞에 보이도록 모바일 전용 위치 재설정 */
+  .mobile-util-row{
+    display:flex!important;
+  }
+}
+
+/* 모바일 유틸 행을 만들기 위해 header 내부에 JS로 추가되는 버튼 스타일 */
+.mobile-util-row{
+  display:none;
+  order:2;
+  width:100%;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  flex-wrap:nowrap;
+}
+.mobile-util-row .theme-mobile-btn{
+  min-width:92px;
+  height:38px;
+  padding:0 10px!important;
+  border-radius:11px!important;
+  font-size:12px!important;
+  white-space:nowrap;
+}
+@media (max-width:420px){
+  .mobile-util-row{
+    gap:4px;
+  }
+  .mobile-util-row .theme-mobile-btn{
+    min-width:82px;
+    font-size:11px!important;
+    padding:0 7px!important;
+  }
+  .dbtn{
+    width:34px!important;
+    min-width:34px!important;
+    height:36px!important;
+    font-size:15px!important;
+  }
+  #dbtn-tablet{
+    font-size:22px!important;
+  }
+  #admin-login-btn{
+    min-width:64px!important;
+    padding:0 7px!important;
+    font-size:10px!important;
+  }
+}
+
+
+
+/* ===== Device buttons as text labels ===== */
+.dbtn{
+  font-family:var(--sans)!important;
+  font-weight:800!important;
+  letter-spacing:-.2px!important;
+}
+
+@media (max-width:768px){
+  .dbtn{
+    width:auto!important;
+    min-width:48px!important;
+    height:38px!important;
+    padding:0 9px!important;
+    font-size:12px!important;
+    line-height:1!important;
+    border-radius:11px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    color:var(--text2)!important;
+  }
+
+  #dbtn-tablet{
+    min-width:62px!important;
+    font-size:12px!important;
+    font-weight:800!important;
+  }
+
+  #dbtn-mobile{
+    min-width:58px!important;
+  }
+
+  .dbtn.adev{
+    color:var(--accent)!important;
+    border-color:var(--borderB)!important;
+    background:rgba(0,212,255,.08)!important;
+  }
+
+  .mobile-util-row{
+    gap:5px!important;
+  }
+
+  .mobile-util-row .theme-mobile-btn{
+    min-width:78px!important;
+  }
+}
+
+@media (max-width:420px){
+  .dbtn{
+    min-width:43px!important;
+    height:36px!important;
+    padding:0 7px!important;
+    font-size:11px!important;
+  }
+
+  #dbtn-tablet{
+    min-width:54px!important;
+    font-size:11px!important;
+  }
+
+  #dbtn-mobile{
+    min-width:50px!important;
+  }
+
+  .mobile-util-row .theme-mobile-btn{
+    min-width:72px!important;
+    font-size:10px!important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -937,9 +1151,9 @@ body.device-mobile .app{
     </div>
     <button class="ham" onclick="toggleMob()">&#9776;</button>
     <div style="display:flex;align-items:center;gap:4px">
-      <button class="dbtn adev" id="dbtn-pc" onclick="setDevice('pc')" title="PC">&#128187;</button>
-      <button class="dbtn" id="dbtn-tablet" onclick="setDevice('tablet')" title="태블릿">&#9727;</button>
-      <button class="dbtn" id="dbtn-mobile" onclick="setDevice('mobile')" title="모바일">&#128241;</button>
+      <button class="dbtn adev" id="dbtn-pc" onclick="setDevice('pc')" title="PC">PC</button>
+      <button class="dbtn" id="dbtn-tablet" onclick="setDevice('tablet')" title="태블릿">태블릿</button>
+      <button class="dbtn" id="dbtn-mobile" onclick="setDevice('mobile')" title="모바일">모바일</button>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
       <button class="btn" id="admin-login-btn" onclick="adminLogin()" style="font-size:11px">&#128274; 관리자</button>
@@ -2345,7 +2559,7 @@ function initPreviewResizer() {
 (function showBuildMarker(){
   function ready(){
     var el = document.createElement("div");
-    el.textContent = "build 2026-06-08-mobile-topnav-v10";
+    el.textContent = "build 2026-06-08-device-text-v12";
     el.style.cssText = "position:fixed;left:8px;bottom:6px;z-index:99999;font:10px monospace;color:rgba(136,146,164,.5);pointer-events:none";
     document.body.appendChild(el);
   }
@@ -2371,6 +2585,80 @@ function initPreviewResizer() {
         ro.observe(body);
       }
     }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
+  else ready();
+})();
+
+
+
+function syncMobileUtilityRow() {
+  var hright = document.querySelector(".hright");
+  if (!hright) return;
+
+  var row = document.getElementById("mobile-util-row");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "mobile-util-row";
+    row.className = "mobile-util-row";
+
+    var themeBtn = document.createElement("button");
+    themeBtn.type = "button";
+    themeBtn.className = "btn theme-mobile-btn";
+    themeBtn.id = "theme-mobile-btn";
+    themeBtn.onclick = function(){ toggleTheme(); syncMobileUtilityRow(); };
+    row.appendChild(themeBtn);
+
+    var deviceBox = document.createElement("div");
+    deviceBox.id = "mobile-device-box";
+    deviceBox.style.cssText = "display:flex;align-items:center;gap:4px";
+    row.appendChild(deviceBox);
+
+    var adminBox = document.createElement("div");
+    adminBox.id = "mobile-admin-box";
+    adminBox.style.cssText = "display:flex;align-items:center;gap:4px";
+    row.appendChild(adminBox);
+
+    var navTabs = hright.querySelector(".nav-tabs");
+    if (navTabs && navTabs.nextSibling) {
+      hright.insertBefore(row, navTabs.nextSibling);
+    } else {
+      hright.appendChild(row);
+    }
+  }
+
+  var themeMain = document.getElementById("theme-toggle");
+  var themeMobile = document.getElementById("theme-mobile-btn");
+  if (themeMain && themeMobile) {
+    themeMobile.innerHTML = themeMain.innerHTML;
+    themeMobile.title = themeMain.title || "테마 전환";
+  }
+
+  var deviceBox = document.getElementById("mobile-device-box");
+  var adminBox = document.getElementById("mobile-admin-box");
+  var originalDevice = hright.querySelector('div[style*="gap:4px"]');
+  var originalAdmin = hright.querySelector('div[style*="gap:6px"]');
+
+  if (window.innerWidth <= 768) {
+    if (deviceBox && originalDevice && originalDevice.parentNode !== row) {
+      deviceBox.appendChild(originalDevice);
+    }
+    if (adminBox && originalAdmin && originalAdmin.parentNode !== row) {
+      adminBox.appendChild(originalAdmin);
+    }
+  }
+}
+
+(function initMobileUtilityRow(){
+  function ready(){
+    syncMobileUtilityRow();
+    window.addEventListener("resize", function(){
+      clearTimeout(window.__rpMobileUtilTimer);
+      window.__rpMobileUtilTimer = setTimeout(syncMobileUtilityRow, 120);
+    });
+    window.addEventListener("orientationchange", function(){
+      setTimeout(syncMobileUtilityRow, 250);
+    });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
   else ready();
