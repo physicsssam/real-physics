@@ -822,6 +822,105 @@ body.device-mobile .app{
   pointer-events:none;
 }
 
+
+
+/* ===== Mobile top navigation fix ===== */
+@media (max-width:768px){
+  header{
+    position:sticky!important;
+    top:0!important;
+    z-index:150!important;
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:10px!important;
+    padding:12px 14px 10px!important;
+    background:rgba(10,14,26,.96)!important;
+    backdrop-filter:blur(12px)!important;
+    border-bottom:1px solid var(--border)!important;
+  }
+
+  header > div:first-child{
+    width:100%!important;
+  }
+
+  .hright{
+    width:100%!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:8px!important;
+  }
+
+  .nav-tabs{
+    width:100%!important;
+    order:1!important;
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important;
+  }
+
+  .nav-tabs .nav-tab{
+    display:flex!important;
+    justify-content:center!important;
+    align-items:center!important;
+    min-height:42px!important;
+    padding:10px 8px!important;
+    font-size:13px!important;
+    border-radius:12px!important;
+    white-space:nowrap!important;
+  }
+
+  .nav-tabs .theme-toggle{
+    grid-column:1/-1!important;
+    min-height:36px!important;
+    font-size:12px!important;
+    opacity:.9;
+  }
+
+  .ham,
+  .mob-nav{
+    display:none!important;
+  }
+
+  .hright > div[style*="display:flex"]{
+    order:2!important;
+    justify-content:center!important;
+    flex-wrap:wrap!important;
+  }
+
+  #admin-login-btn{
+    order:3!important;
+    width:100%!important;
+    min-height:38px!important;
+  }
+
+  .pages{
+    padding-top:0!important;
+  }
+
+  .gw{
+    padding-top:12px!important;
+  }
+
+  .gtop{
+    margin-top:0!important;
+  }
+}
+
+/* Very small iPhone width: keep buttons readable */
+@media (max-width:420px){
+  .nav-tabs .nav-tab{
+    font-size:12px!important;
+    padding:9px 6px!important;
+  }
+  .logo-main{
+    font-size:18px!important;
+  }
+  .logo-sub{
+    font-size:11px!important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -2246,7 +2345,7 @@ function initPreviewResizer() {
 (function showBuildMarker(){
   function ready(){
     var el = document.createElement("div");
-    el.textContent = "build 2026-06-08-modal-scale-v9";
+    el.textContent = "build 2026-06-08-mobile-topnav-v10";
     el.style.cssText = "position:fixed;left:8px;bottom:6px;z-index:99999;font:10px monospace;color:rgba(136,146,164,.5);pointer-events:none";
     document.body.appendChild(el);
   }
