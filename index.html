@@ -663,9 +663,138 @@ body.device-mobile .app{
 
 
 
-.brand-home{cursor:pointer;display:block}
-.brand-home:hover .logo-main{filter:brightness(1.15)}
-.brand-home:hover .logo-sub{color:var(--accent)}
+/* ===== Mobile gallery blank-screen fix ===== */
+@media (max-width: 768px){
+  .pages{
+    flex:0 0 auto!important;
+    height:auto!important;
+    min-height:100vh!important;
+    max-height:none!important;
+    overflow:visible!important;
+    position:relative!important;
+  }
+
+  .page{
+    position:relative!important;
+    inset:auto!important;
+    width:100%!important;
+    min-height:auto!important;
+    height:auto!important;
+    max-height:none!important;
+    overflow:visible!important;
+    display:none!important;
+  }
+
+  .page.active{
+    display:flex!important;
+  }
+
+  #page-gallery.active{
+    display:flex!important;
+    flex-direction:column!important;
+    min-height:100vh!important;
+    padding-bottom:36px!important;
+  }
+
+  #page-runner.active{
+    display:flex!important;
+    flex-direction:column!important;
+  }
+
+  .gw{
+    width:100%!important;
+    height:auto!important;
+    min-height:auto!important;
+    overflow:visible!important;
+    padding:10px!important;
+  }
+
+  .gtop,
+  .g-controls{
+    width:100%!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:8px!important;
+  }
+
+  #gg{
+    width:100%!important;
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:12px!important;
+    min-height:120px!important;
+  }
+}
+
+
+.brand-home{cursor:pointer;display:block}.brand-home:hover .logo-main{filter:brightness(1.15)}
+
+
+/* ===== Gallery list-first loading / more button ===== */
+.gallery-more-wrap{
+  grid-column:1/-1;
+  display:flex;
+  justify-content:center;
+  padding:18px 0 28px;
+}
+.gallery-more-wrap .btn{min-width:180px}
+.gallery-loading{
+  grid-column:1/-1;
+  text-align:center;
+  padding:34px 12px;
+  color:var(--text2);
+  font-family:var(--mono);
+  font-size:12px;
+}
+.detail-loading-html{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:10px;
+  background:#0a0e1a;
+  color:#8892a4;
+  font-family:monospace;
+}
+.detail-loading-html .spin{
+  width:30px;
+  height:30px;
+  border:3px solid rgba(255,255,255,.15);
+  border-top-color:#00d4ff;
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== Mobile preview height drag handle ===== */
+.pv-resize-handle{
+  display:none;
+}
+@media (max-width:768px){
+  .pv-resize-handle{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    height:34px;
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text2);
+    border-top:1px solid var(--border);
+    background:var(--bg3);
+    cursor:ns-resize;
+    touch-action:none;
+    user-select:none;
+  }
+  #preview-frame,
+  .preview iframe{
+    height:var(--mobile-preview-height, 42vh)!important;
+    min-height:260px!important;
+    max-height:78vh!important;
+  }
+}
 
 </style>
 </head>
@@ -677,8 +806,8 @@ body.device-mobile .app{
   </div>
   <div class="hright">
     <div class="nav-tabs">
-      <button class="nav-tab" id="ntab-runner" onclick="sp('runner',this)">&#9889; 실험 실행기</button>
-      <button class="nav-tab active" id="ntab-gallery" onclick="sp('gallery',this)">&#128300; 갤러리</button>
+      <button class="nav-tab active" id="ntab-runner" onclick="sp('runner',this)">&#9889; 실험 실행기</button>
+      <button class="nav-tab" id="ntab-gallery" onclick="sp('gallery',this)">&#128300; 갤러리</button>
 <button class="btn theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="라이트모드로 전환">☀️ 라이트모드</button>
     </div>
     <button class="ham" onclick="toggleMob()">&#9776;</button>
@@ -744,6 +873,7 @@ AI에게 이렇게 요청해보세요:
           <div class="pv-ph" id="pvph"><div class="ei">&#9883;</div><p>코드를 입력하고<br>[&#9654; 실행]을 눌러주세요</p></div>
           <iframe id="preview-frame" sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups allow-downloads"></iframe>
         </div>
+        <div class="pv-resize-handle" id="pv-resize-handle">↕ 실행 화면 높이 조절</div>
         <div class="pv-foot"><span style="font-family:var(--mono);font-size:10px;color:var(--text2);opacity:.3">sandbox &#183; 안전 실행 환경</span></div>
       </div>
     </div>
@@ -805,8 +935,8 @@ AI에게 이렇게 요청해보세요:
     <div class="gtop">
       <h2>갤러리</h2>
       <div class="g-controls">
-        <div class="search-wrap"><span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="제목 검색..." oninput="renderG()"></div>
-        <select class="sort-sel" id="sort-sel" onchange="renderG()">
+        <div class="search-wrap"><span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="제목 검색..." oninput="loadPostsDebounced()"></div>
+        <select class="sort-sel" id="sort-sel" onchange="loadPosts(true)">
           <option value="latest">최신순</option><option value="views">조회수순</option><option value="title">제목순</option>
         </select>
         <button class="btn" onclick="showQR(location.href,'홈페이지 QR','Real Physics 홈페이지')" style="font-size:11px;padding:6px 10px">&#128241; QR</button>
@@ -910,6 +1040,13 @@ var PUBLIC_REPORT_PROMPT = `아래에 내가 생성형 AI와 실제로 나눈 �
 
 var EX = ["<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>body{background:#0a0e1a;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;color:#fff}.ctrl{margin-top:14px;display:flex;gap:14px;font-size:13px;color:#8892a4}label{display:flex;align-items:center;gap:6px}input[type=range]{width:120px}</style></head><body><canvas id=\"c\" width=\"380\" height=\"310\"></canvas><div class=\"ctrl\"><label>\uae38\uc774<input id=\"L\" type=\"range\" min=\"60\" max=\"180\" value=\"120\"><span id=\"Lv\">120</span>px</label><label>\uac01\ub3c4<input id=\"A\" type=\"range\" min=\"5\" max=\"75\" value=\"40\"><span id=\"Av\">40</span>&#176;</label><button onclick=\"reset()\" style=\"padding:6px 14px;background:#00d4ff;border:none;border-radius:6px;color:#0a0e1a;font-weight:700;cursor:pointer\">\ub9ac\uc14b</button></div><script>var cv=document.getElementById(\"c\"),ctx=cv.getContext(\"2d\"),cx=190,cy=40,g=9.8,L,angle,omega=0;function reset(){L=+document.getElementById(\"L\").value;angle=+document.getElementById(\"A\").value*Math.PI/180;omega=0}[\"L\",\"A\"].forEach(function(id){document.getElementById(id).oninput=function(e){document.getElementById(id+\"v\").textContent=e.target.value;reset()}});reset();function draw(){ctx.clearRect(0,0,380,310);var alpha=-(g/L)*Math.sin(angle);omega+=alpha*0.016;angle+=omega*0.016;var bx=cx+L*Math.sin(angle),by=cy+L*Math.cos(angle);ctx.strokeStyle=\"rgba(255,255,255,.25)\";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(bx,by);ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle=\"#8892a4\";ctx.fill();ctx.beginPath();ctx.arc(bx,by,16,0,Math.PI*2);ctx.fillStyle=\"#00d4ff\";ctx.fill();ctx.fillStyle=\"#0a0e1a\";ctx.font=\"bold 11px sans-serif\";ctx.textAlign=\"center\";ctx.fillText(\"m\",bx,by+4);ctx.fillStyle=\"#8892a4\";ctx.font=\"12px sans-serif\";ctx.fillText(\"T=\"+(2*Math.PI*Math.sqrt(L/980)).toFixed(2)+\"s\",190,295);requestAnimationFrame(draw)}draw()<\/script></body></html>","<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>body{background:#0a0e1a;color:#fff;font-family:sans-serif;margin:0;display:flex;flex-direction:column;align-items:center;padding:16px}canvas{background:#0a0e1a;border:1px solid rgba(255,255,255,.05);border-radius:8px}.ctrl{display:flex;gap:14px;margin:10px 0;flex-wrap:wrap;justify-content:center;font-size:13px;color:#8892a4}label{display:flex;align-items:center;gap:5px}input[type=range]{width:90px}button{padding:7px 18px;background:#7c3aed;border:none;border-radius:6px;color:#fff;cursor:pointer;font-weight:700}</style></head><body><canvas id=\"c\" width=\"500\" height=\"280\"></canvas><div class=\"ctrl\"><label>\ucd08\uc18d\ub3c4<input id=\"v0\" min=\"10\" max=\"80\" value=\"40\" type=\"range\"><span id=\"v0v\">40</span>m/s</label><label>\uac01\ub3c4<input id=\"th\" min=\"5\" max=\"85\" value=\"45\" type=\"range\"><span id=\"thv\">45</span>&#176;</label><button onclick=\"launch()\">\ubc1c\uc0ac!</button></div><script>var cv=document.getElementById(\"c\"),ctx=cv.getContext(\"2d\"),g=9.8,sc=4.5,ox=30,oy=250,anim,trail=[];[\"v0\",\"th\"].forEach(function(id){document.getElementById(id).oninput=function(e){document.getElementById(id+\"v\").textContent=e.target.value}});function launch(){cancelAnimationFrame(anim);trail=[];var v0=+document.getElementById(\"v0\").value,th=+document.getElementById(\"th\").value*Math.PI/180,vx=v0*Math.cos(th),vy=v0*Math.sin(th),t=0;function step(){ctx.clearRect(0,0,500,280);ctx.strokeStyle=\"rgba(255,255,255,.08)\";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(500,oy);ctx.stroke();var x=vx*t,y=vy*t-0.5*g*t*t;if(y<0&&t>0){ctx.fillStyle=\"#8892a4\";ctx.font=\"12px sans-serif\";ctx.textAlign=\"left\";ctx.fillText(\"\uc0ac\uac70\ub9ac:\"+(vx*2*vy/g).toFixed(1)+\"m \ucd5c\uace0\ub192\uc774:\"+(vy*vy/(2*g)).toFixed(1)+\"m\",10,20);return}trail.push({x:x,y:y});ctx.strokeStyle=\"rgba(124,58,237,.5)\";ctx.lineWidth=2;ctx.beginPath();trail.forEach(function(p,i){if(i===0)ctx.moveTo(ox+p.x*sc,oy-p.y*sc);else ctx.lineTo(ox+p.x*sc,oy-p.y*sc)});ctx.stroke();ctx.beginPath();ctx.arc(ox+x*sc,oy-y*sc,7,0,Math.PI*2);ctx.fillStyle=\"#00d4ff\";ctx.fill();t+=0.05;anim=requestAnimationFrame(step)}step()}launch()<\/script></body></html>","<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>body{background:#0a0e1a;color:#fff;font-family:sans-serif;margin:0;display:flex;flex-direction:column;align-items:center;padding:16px}canvas{background:#0a0e1a;border-radius:8px}.ctrl{display:flex;gap:14px;font-size:13px;color:#8892a4;margin-top:10px;flex-wrap:wrap;justify-content:center}label{display:flex;align-items:center;gap:5px}input[type=range]{width:90px}</style></head><body><canvas id=\"c\" width=\"500\" height=\"280\"></canvas><div class=\"ctrl\"><label>\ud30c1 \uc9c4\ub3d9\uc218<input id=\"f1\" type=\"range\" min=\"1\" max=\"5\" value=\"2\" step=\".5\"><span id=\"f1v\">2</span>Hz</label><label>\ud30c2 \uc9c4\ub3d9\uc218<input id=\"f2\" type=\"range\" min=\"1\" max=\"5\" value=\"3\" step=\".5\"><span id=\"f2v\">3</span>Hz</label></div><script>var cv=document.getElementById(\"c\"),ctx=cv.getContext(\"2d\"),t=0;[\"f1\",\"f2\"].forEach(function(id){document.getElementById(id).oninput=function(e){document.getElementById(id+\"v\").textContent=e.target.value}});function draw(){ctx.clearRect(0,0,500,280);var f1=+document.getElementById(\"f1\").value,f2=+document.getElementById(\"f2\").value;[[\"#00d4ff\",f1,60,\"\ud30c1\"],[\"#7c3aed\",f2,140,\"\ud30c2\"],[\"#10b981\",0,225,\"\ud569\uc131\"]].forEach(function(a){var color=a[0],freq=a[1],yo=a[2],lbl=a[3];ctx.beginPath();for(var x=0;x<500;x++){var nx=x/500,y=freq?yo+35*Math.sin(2*Math.PI*(freq*nx+t)):yo+35*(Math.sin(2*Math.PI*(f1*nx+t))+Math.sin(2*Math.PI*(f2*nx+t)))/2;if(x===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.strokeStyle=color;ctx.lineWidth=lbl===\"\ud569\uc131\"?2.5:1.5;ctx.stroke();ctx.fillStyle=color;ctx.font=\"11px sans-serif\";ctx.fillText(lbl,4,yo-16)});t+=0.005;requestAnimationFrame(draw)}draw()<\/script></body></html>","<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>body{background:#0a0e1a;color:#fff;font-family:sans-serif;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}canvas{background:#0a0e1a}.ctrl{margin-top:14px;display:flex;gap:14px;font-size:13px;color:#8892a4}label{display:flex;align-items:center;gap:5px}input[type=range]{width:100px}</style></head><body><canvas id=\"c\" width=\"400\" height=\"260\"></canvas><div class=\"ctrl\"><label>\uc9c8\ub7c9<input id=\"m\" type=\"range\" min=\"1\" max=\"5\" value=\"2\"><span id=\"mv\">2</span>kg</label><label>\ubcc0\uc704<input id=\"A\" type=\"range\" min=\"20\" max=\"100\" value=\"60\"><span id=\"Av\">60</span>px</label></div><script>var cv=document.getElementById(\"c\"),ctx=cv.getContext(\"2d\"),k=200,cx=200,x,v=0;function reset(){x=+document.getElementById(\"A\").value;v=0}[\"m\",\"A\"].forEach(function(id){document.getElementById(id).oninput=function(e){document.getElementById(id+\"v\").textContent=e.target.value;reset()}});reset();function drawSpring(x0,y0,x1){var seg=(x1-x0)/32,amp=11;ctx.beginPath();ctx.moveTo(x0,y0);for(var i=0;i<32;i++){var px=x0+(i+1)*seg,py=y0+(i%4<2?amp:-amp);ctx.lineTo(px,py)}ctx.lineTo(x1,y0);ctx.strokeStyle=\"#8892a4\";ctx.lineWidth=2;ctx.stroke()}function draw(){ctx.clearRect(0,0,400,260);var m=+document.getElementById(\"m\").value,a=-k/m*x;v+=a*0.016;x+=v*0.016;var bx=cx+x,by=130;ctx.fillStyle=\"rgba(255,255,255,.08)\";ctx.fillRect(0,0,6,260);drawSpring(6,by,bx-18);ctx.fillStyle=\"#00d4ff\";ctx.fillRect(bx-18,by-18,36,36);ctx.fillStyle=\"#0a0e1a\";ctx.font=\"bold 12px sans-serif\";ctx.textAlign=\"center\";ctx.fillText(\"m\",bx,by+5);ctx.fillStyle=\"#8892a4\";ctx.font=\"11px sans-serif\";ctx.fillText(\"T=\"+(2*Math.PI*Math.sqrt(m/k)).toFixed(2)+\"s\",200,16);requestAnimationFrame(draw)}draw()<\/script></body></html>","<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><style>body{background:#0a0e1a;color:#fff;font-family:sans-serif;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}.ctrl{margin-top:14px;display:flex;gap:14px;font-size:13px;color:#8892a4;flex-wrap:wrap;justify-content:center}label{display:flex;align-items:center;gap:5px}input[type=range]{width:100px}.info{margin-top:8px;font-size:14px;color:#00d4ff;font-family:monospace}</style></head><body><canvas id=\"c\" width=\"380\" height=\"240\"></canvas><div class=\"ctrl\"><label>\uc804\uc555 V<input id=\"V\" type=\"range\" min=\"1\" max=\"20\" value=\"9\"><span id=\"Vv\">9</span>V</label><label>\uc800\ud56d R<input id=\"R\" type=\"range\" min=\"1\" max=\"20\" value=\"3\"><span id=\"Rv\">3</span>&#937;</label></div><div class=\"info\" id=\"info\"></div><script>var cv=document.getElementById(\"c\"),ctx=cv.getContext(\"2d\"),t=0;[\"V\",\"R\"].forEach(function(id){document.getElementById(id).oninput=function(e){document.getElementById(id+\"v\").textContent=e.target.value}});function draw(){ctx.clearRect(0,0,380,240);var V=+document.getElementById(\"V\").value,R=+document.getElementById(\"R\").value,I=V/R,P=V*I;document.getElementById(\"info\").textContent=\"I=\"+I.toFixed(2)+\"A P=\"+P.toFixed(2)+\"W\";ctx.strokeStyle=\"rgba(255,255,255,.12)\";ctx.lineWidth=3;ctx.lineJoin=\"round\";ctx.beginPath();ctx.moveTo(50,50);ctx.lineTo(330,50);ctx.lineTo(330,190);ctx.lineTo(50,190);ctx.lineTo(50,50);ctx.stroke();ctx.fillStyle=\"#00d4ff\";ctx.fillRect(30,95,40,40);ctx.fillStyle=\"#0a0e1a\";ctx.font=\"bold 10px sans-serif\";ctx.textAlign=\"center\";ctx.fillText(V+\"V\",50,118);ctx.strokeStyle=\"#f87171\";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(295,50);ctx.lineTo(295,190);ctx.stroke();ctx.fillStyle=\"#f87171\";ctx.font=\"bold 10px sans-serif\";ctx.fillText(R+\"ohm\",307,123);var speed=I*2.5,pts=[],i;for(i=0;i<5;i++){var p=(t*speed/360+i/5)%1,px,py;if(p<.65){px=50+p/.65*280;py=50}else if(p<.82){var q=(p-.65)/.17;px=330;py=50+q*140}else{var q2=(p-.82)/.18;px=330-q2*280;py=190}pts.push({x:px,y:py})}pts.forEach(function(pt){ctx.beginPath();ctx.arc(pt.x,pt.y,5,0,Math.PI*2);ctx.fillStyle=\"#00d4ff\";ctx.shadowColor=\"#00d4ff\";ctx.shadowBlur=8;ctx.fill();ctx.shadowBlur=0});t+=.3;requestAnimationFrame(draw)}draw()<\/script></body></html>"];
 
+
+var PAGE_SIZE = 12;
+var nextOffset = 0;
+var hasMorePosts = true;
+var isLoadingPosts = false;
+var lastListKey = "";
+
 var posts = [], curF = "all", openP = null, pwAct = null, isAdmin = false;
 var currentDevice = "pc";
 var views = JSON.parse(localStorage.getItem("rp_views") || "{}");
@@ -924,9 +1061,16 @@ function apiFetch(method, body) {
 function sp(id, btn) {
   document.querySelectorAll(".page").forEach(function(p) { p.classList.remove("active"); });
   document.querySelectorAll(".nav-tabs .nav-tab").forEach(function(b) { b.classList.remove("active"); });
-  document.getElementById("page-" + id).classList.add("active");
-  btn.classList.add("active");
-  if (id === "gallery") loadPosts();
+
+  var page = document.getElementById("page-" + id);
+  if (page) page.classList.add("active");
+
+  if (!btn) btn = document.getElementById("ntab-" + id);
+  if (btn && btn.classList) btn.classList.add("active");
+
+  if (id === "gallery") {
+    setTimeout(function(){ loadPosts(true); }, 0);
+  }
 }
 function toggleMob() { document.getElementById("mob-nav").classList.toggle("open"); }
 function closeMob() { document.getElementById("mob-nav").classList.remove("open"); }
@@ -1142,13 +1286,61 @@ function checkSensitiveBeforeSubmit(code, aiLog, publicReport) {
 }
 function loadEx(i) { document.getElementById("code-input").value = EX[i]; runCode(); }
 
-function loadPosts() {
+function getGalleryQueryKey() {
+  var q = (document.getElementById("search-input") ? document.getElementById("search-input").value : "").trim();
+  var sort = document.getElementById("sort-sel") ? document.getElementById("sort-sel").value : "latest";
+  return JSON.stringify({ tag: curF || "all", q: q, sort: sort });
+}
+
+function loadPosts(reset) {
   var grid = document.getElementById("gg");
-  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text2);font-size:13px;opacity:.5">불러오는 중...</div>';
-  apiFetch("GET").then(function(data) {
-    if (data.status === "ok") { posts = data.posts || []; renderG(); }
-    else { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--red);font-size:12px">오류: ' + (data.message || "알 수 없는 오류") + "</div>"; }
-  }).catch(function(e) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--red);font-size:12px">연결 오류: ' + e.message + "</div>"; });
+  if (!grid) return;
+  if (isLoadingPosts) return;
+
+  var key = getGalleryQueryKey();
+  if (reset !== false || key !== lastListKey) {
+    posts = [];
+    nextOffset = 0;
+    hasMorePosts = true;
+    lastListKey = key;
+    grid.innerHTML = '<div class="gallery-loading">갤러리 목록을 불러오는 중...</div>';
+  }
+
+  if (!hasMorePosts) {
+    renderG();
+    return;
+  }
+
+  isLoadingPosts = true;
+
+  var q = (document.getElementById("search-input") ? document.getElementById("search-input").value : "").trim();
+  var sort = document.getElementById("sort-sel") ? document.getElementById("sort-sel").value : "latest";
+
+  apiFetch("POST", {
+    action: "listPosts",
+    offset: nextOffset,
+    limit: PAGE_SIZE,
+    tag: curF || "all",
+    q: q,
+    sort: sort
+  }).then(function(data) {
+    isLoadingPosts = false;
+
+    if (data.status !== "ok") {
+      grid.innerHTML = '<div class="gempty"><div class="ge">⚠️</div><p>갤러리 목록을 불러오지 못했습니다.</p><small>' + esc(data.message || "오류") + '</small></div>';
+      return;
+    }
+
+    var newPosts = data.posts || [];
+    posts = posts.concat(newPosts);
+    nextOffset = typeof data.nextOffset === "number" ? data.nextOffset : posts.length;
+    hasMorePosts = !!data.hasMore;
+
+    renderG();
+  }).catch(function(e) {
+    isLoadingPosts = false;
+    grid.innerHTML = '<div class="gempty"><div class="ge">⚠️</div><p>갤러리 연결 오류</p><small>' + esc(e.message || e) + '</small></div>';
+  });
 }
 
 var EMOJI = { "역학": "⚙️", "전기": "⚡", "파동": "🌊", "열역학": "🌡️", "광학": "💡", "기타": "🔬", "교사자료": "👨‍🏫" };
@@ -1157,43 +1349,68 @@ function esc(s) { var d = document.createElement("div"); d.textContent = s; retu
 
 function renderG() {
   var grid = document.getElementById("gg");
-  var q = (document.getElementById("search-input") ? document.getElementById("search-input").value : "").toLowerCase();
-  var sort = document.getElementById("sort-sel") ? document.getElementById("sort-sel").value : "latest";
+  if (!grid) return;
+
   var list = posts.slice();
-  if (curF !== "all") list = list.filter(function(p) { return p.tag === curF; });
-  if (q) list = list.filter(function(p) { return (p.title || "").toLowerCase().indexOf(q) >= 0 || (p.author || "").toLowerCase().indexOf(q) >= 0; });
-  if (sort === "views") list.sort(function(a, b) { return (views[b.id] || 0) - (views[a.id] || 0); });
-  else if (sort === "title") list.sort(function(a, b) { return (a.title || "").localeCompare(b.title || "", "ko"); });
+
   if (!list.length) {
+    var q = (document.getElementById("search-input") ? document.getElementById("search-input").value : "").trim();
     var ei = curF === "all" ? "🔭" : "🔍";
-    var em = q ? '"' + q + '" 검색 결과가 없어요.' : curF === "all" ? "아직 작품이 없어요. 실행기에서 올려보세요!" : "이 단원의 작품이 없어요.";
+    var em = q ? '"' + esc(q) + '" 검색 결과가 없어요.' : curF === "all" ? "아직 작품이 없어요. 실행기에서 올려보세요!" : "이 단원의 작품이 없어요.";
     grid.innerHTML = '<div class="gempty"><div class="ge">' + ei + '</div><p>' + em + '</p>' + (!q && curF === "all" ? '<button class="btn brun" id="go-runner-btn">실행기로 가기</button>' : "") + "</div>";
-    if (!q && curF === "all") { var rb = document.getElementById("go-runner-btn"); if (rb) rb.addEventListener("click", function() { sp("gallery", document.getElementById("ntab-gallery")); }); }
+    if (!q && curF === "all") {
+      var rb = document.getElementById("go-runner-btn");
+      if (rb) rb.addEventListener("click", function() { sp("runner", document.getElementById("ntab-runner")); });
+    }
     return;
   }
+
   var h = "";
   list.forEach(function(p) {
     var pid = String(p.id);
     h += '<div class="card" data-id="' + esc(pid) + '">'
-      + '<div class="ct" style="background:' + (TBGC[p.tag] || "#111") + '">' + (EMOJI[p.tag] || "🔬") + '<div class="view-badge">👁 ' + (views[pid] || 0) + "</div></div>"
+      + '<div class="ct" style="background:' + (TBGC[p.tag] || "#111") + '">' + (EMOJI[p.tag] || "🔬") + '<div class="view-badge">👁 ' + (views[pid] || Number(p.views || 0) || 0) + "</div></div>"
       + '<div class="cb"><div class="ctitle">' + esc(p.title || "") + "</div>"
       + '<div class="cmeta"><span class="cauthor">' + esc(p.author || "익명") + " · " + esc(p.date || "") + '</span><span class="ctag tag-' + (p.tag || "기타") + '">' + (p.tag || "기타") + "</span></div>"
       + (p.desc ? '<div class="cdesc">' + esc(p.desc) + "</div>" : "")
       + "</div></div>";
   });
+
+  if (hasMorePosts) {
+    h += '<div class="gallery-more-wrap"><button class="btn brun" id="more-posts-btn">더 보기 · 다음 12개</button></div>';
+  } else {
+    h += '<div class="gallery-more-wrap"><span style="font-size:11px;color:var(--text2);font-family:var(--mono);opacity:.65">마지막 작품까지 모두 불러왔습니다.</span></div>';
+  }
+
   grid.innerHTML = h;
+
   grid.querySelectorAll(".card").forEach(function(card) {
     card.addEventListener("click", function() { openM(this.getAttribute("data-id")); });
   });
+
+  var more = document.getElementById("more-posts-btn");
+  if (more) {
+    more.addEventListener("click", function(e) {
+      e.stopPropagation();
+      this.disabled = true;
+      this.textContent = "불러오는 중...";
+      loadPosts(false);
+    });
+  }
 }
 
-function filterG(tag, btn) { curF = tag; document.querySelectorAll(".fbtn").forEach(function(b) { b.classList.remove("on"); }); btn.classList.add("on"); renderG(); }
+function filterG(tag, btn) {
+  curF = tag;
+  document.querySelectorAll(".fbtn").forEach(function(b) { b.classList.remove("on"); });
+  if (btn) btn.classList.add("on");
+  loadPosts(true);
+}
 function switchSub(id, btn) {
   document.querySelectorAll("[id^='sub-']").forEach(function(el) { el.style.display = "none"; });
   document.querySelectorAll("[id^='subtab-']").forEach(function(b) { b.classList.remove("active"); });
   document.getElementById("sub-" + id).style.display = "block";
   btn.classList.add("active");
-  if (id === "student") loadPosts();
+  if (id === "student") loadPosts(true);
 }
 
 function postToG() {
@@ -1223,7 +1440,7 @@ function postToG() {
         st.textContent = "";
         document.getElementById("us").classList.remove("open");
         sp("gallery", document.getElementById("ntab-gallery"));
-        loadPosts();
+        loadPosts(true);
       }, 700);
     } else { setSt(st, "오류: " + (data.message || "실패"), "r"); }
   }).catch(function(e) { document.getElementById("post-btn").disabled = false; setSt(st, "오류: " + e.message, "r"); });
@@ -1231,27 +1448,59 @@ function postToG() {
 function setSt(el, msg, t) { el.style.color = t === "r" ? "var(--red)" : "var(--green)"; el.textContent = msg; if (t === "r") setTimeout(function() { el.textContent = ""; }, 2500); }
 
 function openM(id) {
-  var p = null;
-  for (var i = 0; i < posts.length; i++) { if (String(posts[i].id) === String(id)) { p = posts[i]; break; } }
-  if (!p) return; openP = p;
-  views[id] = (views[id] || 0) + 1;
+  var meta = null;
+  for (var i = 0; i < posts.length; i++) {
+    if (String(posts[i].id) === String(id)) { meta = posts[i]; break; }
+  }
+  if (!meta) return;
+
+  openP = meta;
+  views[id] = (views[id] || Number(meta.views || 0) || 0) + 1;
   localStorage.setItem("rp_views", JSON.stringify(views));
-  document.getElementById("mttl").textContent = p.title || "";
-  document.getElementById("mmeta").textContent = (p.author || "익명") + " · " + (p.tag || "") + " · " + (p.date || "") + " · 👁 " + views[id];
-  document.getElementById("mdesc").textContent = p.desc || "";
+
+  document.getElementById("mttl").textContent = meta.title || "";
+  document.getElementById("mmeta").textContent = (meta.author || "익명") + " · " + (meta.tag || "") + " · " + (meta.date || "") + " · 👁 " + views[id];
+  document.getElementById("mdesc").textContent = meta.desc || "";
+
   var reportWrap = document.getElementById("report-wrap");
   var reportBox = document.getElementById("mreport");
-  if (p.publicReport && String(p.publicReport).trim()) {
-    reportBox.textContent = p.publicReport;
-    reportWrap.style.display = "block";
-  } else {
-    reportBox.textContent = "";
-    reportWrap.style.display = "none";
-  }
-  setFrameSrcdoc(document.getElementById("modal-frame"), p.code || "");
+  if (reportWrap) reportWrap.style.display = "none";
+  if (reportBox) reportBox.textContent = "";
+
+  var mac = document.getElementById("mac");
+  if (mac) mac.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--text2)">작품 데이터를 불러오는 중...</span>';
+
+  setFrameSrcdoc(document.getElementById("modal-frame"), '<!DOCTYPE html><html><head><meta charset=\'UTF-8\'><style>body{margin:0;background:#0a0e1a;color:#8892a4;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px}.spin{width:30px;height:30px;border:3px solid rgba(255,255,255,.15);border-top-color:#00d4ff;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style></head><body><div class=\'spin\'></div><div>작품을 불러오는 중...</div></body></html>');
   document.getElementById("mbg").classList.add("on");
   applyModalDevice(currentDevice);
-  setMac();
+
+  apiFetch("POST", { action: "getPostDetail", id: id }).then(function(data) {
+    if (data.status !== "ok" || !data.post) {
+      setFrameSrcdoc(document.getElementById("modal-frame"), "<!DOCTYPE html><html><body style='margin:0;background:#0a0e1a;color:#f87171;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh'>작품을 불러오지 못했습니다.</body></html>");
+      if (mac) mac.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--red)">불러오기 실패</span>';
+      return;
+    }
+
+    openP = Object.assign({}, meta, data.post);
+    document.getElementById("mttl").textContent = openP.title || "";
+    document.getElementById("mmeta").textContent = (openP.author || "익명") + " · " + (openP.tag || "") + " · " + (openP.date || "") + " · 👁 " + views[id];
+    document.getElementById("mdesc").textContent = openP.desc || "";
+
+    if (openP.publicReport && String(openP.publicReport).trim()) {
+      reportBox.textContent = openP.publicReport;
+      reportWrap.style.display = "block";
+    } else {
+      reportBox.textContent = "";
+      reportWrap.style.display = "none";
+    }
+
+    setFrameSrcdoc(document.getElementById("modal-frame"), openP.code || "");
+    applyModalDevice(currentDevice);
+    setMac();
+  }).catch(function(e) {
+    setFrameSrcdoc(document.getElementById("modal-frame"), "<!DOCTYPE html><html><body style='margin:0;background:#0a0e1a;color:#f87171;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh'>연결 오류: " + esc(e.message || e) + "</body></html>");
+    if (mac) mac.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--red)">연결 오류</span>';
+  });
 }
 function setMac() {
   var mac = document.getElementById("mac");
@@ -1301,7 +1550,7 @@ function openPostFs() {
   document.getElementById("fsov").classList.add("on");
 }
 function closeM() { document.getElementById("mbg").classList.remove("on"); document.getElementById("modal-frame").srcdoc = ""; openP = null; }
-function loadToRunner() { if (!openP) return; document.getElementById("code-input").value = openP.code || ""; closeM(); sp("gallery", document.getElementById("ntab-gallery")); runCode(); }
+function loadToRunner() { if (!openP) return; document.getElementById("code-input").value = openP.code || ""; closeM(); sp("runner", document.getElementById("ntab-runner")); runCode(); }
 function downloadCode() {
   if (!openP) return;
   var blob = new Blob([openP.code || ""], { type: "text/html;charset=utf-8" });
@@ -1310,18 +1559,82 @@ function downloadCode() {
   a.click(); URL.revokeObjectURL(a.href);
 }
 
+function makeBaseUrl() {
+  // 현재 페이지 주소에서 ?post=... 같은 쿼리와 #해시를 제거하고,
+  // GitHub Pages 저장소 경로(/real-physics/)는 유지합니다.
+  return location.origin + location.pathname;
+}
+
 function showQR(url, title, desc) {
-  document.getElementById("qr-title").textContent = title || "QR 코드";
-  document.getElementById("qr-desc").textContent = desc || "";
-  document.getElementById("qr-url").textContent = url;
-  var canvas = document.getElementById("qr-canvas"); canvas.innerHTML = "";
-  new QRCode(canvas, { text: url, width: 180, height: 180, colorDark: "#000", colorLight: "#fff", correctLevel: QRCode.CorrectLevel.M });
-  document.getElementById("qr-bg").classList.add("on");
+  var titleEl = document.getElementById("qr-title");
+  var descEl = document.getElementById("qr-desc");
+  var urlEl = document.getElementById("qr-url");
+  var canvas = document.getElementById("qr-canvas");
+  var bg = document.getElementById("qr-bg");
+
+  if (!titleEl || !descEl || !urlEl || !canvas || !bg) {
+    alert("QR 표시 영역을 찾지 못했습니다.\n\n" + url);
+    return;
+  }
+
+  titleEl.textContent = title || "QR 코드";
+  descEl.textContent = desc || "";
+  urlEl.textContent = url;
+  canvas.innerHTML = "";
+
+  try {
+    if (typeof QRCode !== "undefined") {
+      new QRCode(canvas, {
+        text: url,
+        width: 180,
+        height: 180,
+        colorDark: "#000",
+        colorLight: "#fff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } else {
+      throw new Error("QRCode library not loaded");
+    }
+  } catch (err) {
+    // QRCode 라이브러리가 차단되거나 실패해도 대체 QR 이미지를 표시합니다.
+    var img = document.createElement("img");
+    img.alt = "QR 코드";
+    img.width = 180;
+    img.height = 180;
+    img.style.cssText = "width:180px;height:180px;background:#fff;border-radius:10px;padding:8px";
+    img.src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(url);
+    canvas.appendChild(img);
+  }
+
+  if (!document.getElementById("qr-open-link")) {
+    var tools = document.createElement("div");
+    tools.id = "qr-tools";
+    tools.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;margin-top:10px";
+    tools.innerHTML =
+      '<button class="btn" id="qr-copy-link" style="flex:1">링크 복사</button>' +
+      '<button class="btn" id="qr-open-link" style="flex:1">새 창 열기</button>';
+    canvas.parentNode.insertBefore(tools, urlEl.nextSibling);
+
+    document.getElementById("qr-copy-link").onclick = function() {
+      var text = document.getElementById("qr-url").textContent || "";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function(){ alert("링크를 복사했습니다."); });
+      } else {
+        prompt("아래 링크를 복사하세요.", text);
+      }
+    };
+
+    document.getElementById("qr-open-link").onclick = function() {
+      var text = document.getElementById("qr-url").textContent || "";
+      if (text) window.open(text, "_blank");
+    };
+  }
+
+  bg.classList.add("on");
 }
 function showQRforPost() {
   if (!openP) return;
-  var base = location.href.split("?")[0];
-  var fullUrl = base + "?post=" + openP.id + "&mode=full";
+  var fullUrl = makeBaseUrl() + "?post=" + encodeURIComponent(openP.id) + "&mode=full";
   showQR(fullUrl, "📱 시뮬레이션 QR", '"' + (openP.title || "") + '" — 스캔하면 바로 실행됩니다');
 }
 function closeQR() { document.getElementById("qr-bg").classList.remove("on"); }
@@ -1385,7 +1698,7 @@ function confPw() {
     if (!confirm('"' + (openP.title || "") + '"을(를) 삭제할까요?')) return;
     closePwM();
     apiFetch("POST", { action: "delete", id: openP.id, pwHash: pwHash }).then(function(data) {
-      if (data.status === "ok") { closeM(); loadPosts(); } else { alert("오류: " + (data.message || "삭제 실패")); }
+      if (data.status === "ok") { closeM(); loadPosts(true); } else { alert("오류: " + (data.message || "삭제 실패")); }
     });
   } else if (pwAct === "edit") {
     closePwM();
@@ -1436,7 +1749,7 @@ function openEditForm(pwHash) {
     document.getElementById("code-input").value = code;
     closeEditForm();
     closeM();
-    sp("gallery", document.getElementById("ntab-gallery"));
+    sp("runner", document.getElementById("ntab-runner"));
     runCode();
   };
   document.getElementById("edit-save").onclick = function() { saveEditForm(pwHash); };
@@ -1468,7 +1781,7 @@ function saveEditForm(pwHash) {
       st.textContent = "✓ 수정 완료";
       closeEditForm();
       closeM();
-      loadPosts();
+      loadPosts(true);
     } else {
       st.style.color = "var(--red)";
       st.textContent = "오류: " + (data.message || "수정 실패");
@@ -1488,7 +1801,7 @@ function adminDelete() {
   if (!openP || !isAdmin) return;
   if (!confirm('"' + (openP.title || "") + '"을(를) 삭제할까요?')) return;
   apiFetch("POST", { action: "delete", id: openP.id, pwHash: "ADMIN", adminPw: _aKey || "" }).then(function(data) {
-    if (data.status === "ok") { closeM(); loadPosts(); } else { alert("오류: " + (data.message || "삭제 실패")); }
+    if (data.status === "ok") { closeM(); loadPosts(true); } else { alert("오류: " + (data.message || "삭제 실패")); }
   });
 }
 
@@ -1519,21 +1832,20 @@ function adminDelete() {
     overlay.innerHTML = '<div style="font-family:\'Space Mono\',monospace;font-size:13px;color:#00d4ff;opacity:.7">시뮬레이션 불러오는 중...</div>';
     document.body.appendChild(overlay);
 
-    apiFetch("GET").then(function(data) {
-      if (data.status !== "ok") { overlay.innerHTML = '<div style="color:#f87171;font-family:monospace;font-size:13px">불러오기 실패</div>'; return; }
-      var post = (data.posts || []).filter(function(p) { return String(p.id) === String(pid); })[0];
+    apiFetch("POST", { action: "getPostDetail", id: pid }).then(function(data) {
+      if (data.status !== "ok" || !data.post) { overlay.innerHTML = '<div style="color:#f87171;font-family:monospace;font-size:13px">작품을 찾을 수 없습니다</div>'; return; }
+      var post = data.post;
       if (!post || !post.code) { overlay.innerHTML = '<div style="color:#f87171;font-family:monospace;font-size:13px">작품을 찾을 수 없습니다</div>'; return; }
 
       var frame = document.createElement("iframe");
       frame.id = "kiosk-frame";
-      frame.setAttribute("sandbox", "allow-scripts allow-modals allow-forms allow-popups allow-downloads");
+      frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-modals allow-forms allow-popups allow-downloads");
       document.body.appendChild(frame);
 
-      // 제목 오버레이 (3초 후 자동 숨김)
       var titleBar = document.createElement("div");
       titleBar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:10000;padding:10px 18px;background:rgba(10,14,26,.85);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:space-between;transition:opacity .5s";
       titleBar.innerHTML = '<span style="font-family:\'Space Mono\',monospace;font-size:12px;color:#00d4ff">' + (post.title || "") + '</span>'
-        + '<a href="' + location.href.split("?")[0] + '" style="font-family:monospace;font-size:11px;color:#8892a4;text-decoration:none">Real Physics</a>';
+        + '<a href="' + makeBaseUrl() + '" style="font-family:monospace;font-size:11px;color:#8892a4;text-decoration:none">Real Physics</a>';
       document.body.appendChild(titleBar);
       setTimeout(function() { titleBar.style.opacity = "0"; setTimeout(function() { titleBar.style.display = "none"; }, 500); }, 3000);
 
@@ -1786,6 +2098,85 @@ function goHomeGallery() {
     document.addEventListener("DOMContentLoaded", readyStartGallery);
   } else {
     setTimeout(readyStartGallery, 0);
+  }
+})();
+
+
+
+function startAtGallerySafely() {
+  var galleryTab = document.getElementById("ntab-gallery");
+  if (typeof sp === "function") {
+    sp("gallery", galleryTab || null);
+  }
+}
+
+(function initStartAtGallerySafely(){
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function(){
+      setTimeout(startAtGallerySafely, 50);
+    });
+  } else {
+    setTimeout(startAtGallerySafely, 50);
+  }
+})();
+
+
+
+function loadPostsDebounced() {
+  clearTimeout(window.__rpSearchTimer);
+  window.__rpSearchTimer = setTimeout(function() { loadPosts(true); }, 250);
+}
+
+
+
+function initPreviewResizer() {
+  var handle = document.getElementById("pv-resize-handle");
+  var frame = document.getElementById("preview-frame");
+  if (!handle || !frame) return;
+
+  var startY = 0;
+  var startH = 0;
+  var dragging = false;
+
+  function getY(e) {
+    if (e.touches && e.touches.length) return e.touches[0].clientY;
+    return e.clientY;
+  }
+
+  function begin(e) {
+    dragging = true;
+    startY = getY(e);
+    startH = frame.getBoundingClientRect().height || 320;
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  }
+
+  function move(e) {
+    if (!dragging) return;
+    var dy = getY(e) - startY;
+    var h = Math.max(260, Math.min(window.innerHeight * 0.78, startH + dy));
+    document.documentElement.style.setProperty("--mobile-preview-height", Math.round(h) + "px");
+    e.preventDefault();
+  }
+
+  function end() {
+    dragging = false;
+    document.body.style.userSelect = "";
+  }
+
+  handle.addEventListener("mousedown", begin);
+  handle.addEventListener("touchstart", begin, { passive:false });
+  window.addEventListener("mousemove", move, { passive:false });
+  window.addEventListener("touchmove", move, { passive:false });
+  window.addEventListener("mouseup", end);
+  window.addEventListener("touchend", end);
+}
+
+(function initPreviewResizerWhenReady(){
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initPreviewResizer);
+  } else {
+    initPreviewResizer();
   }
 })();
 
