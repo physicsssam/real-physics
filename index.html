@@ -796,6 +796,32 @@ body.device-mobile .app{
   }
 }
 
+
+
+/* ===== Modal preview scale fit ===== */
+.mbody{
+  overflow:hidden;
+  background:var(--bg4);
+}
+#modal-frame{
+  transform-origin:top left;
+  background:#fff;
+  transition:transform .12s ease;
+}
+.modal-scale-label{
+  position:absolute;
+  right:8px;
+  bottom:8px;
+  z-index:4;
+  padding:3px 7px;
+  border-radius:999px;
+  background:rgba(0,0,0,.45);
+  color:rgba(255,255,255,.72);
+  font-family:var(--mono);
+  font-size:10px;
+  pointer-events:none;
+}
+
 </style>
 </head>
 <body>
@@ -969,7 +995,7 @@ AI에게 이렇게 요청해보세요:
 <div class="mbg" id="mbg" onclick="if(event.target===this)closeM()">
   <div class="modal">
     <div class="mhd"><div><div class="mttl" id="mttl"></div><div class="mmeta" id="mmeta"></div></div><button class="btn bdanger" style="font-size:10px" onclick="closeM()">&#10005;</button></div>
-    <div class="mbody"><iframe id="modal-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe></div>
+    <div class="mbody"><iframe id="modal-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe><div class="modal-scale-label" id="modal-scale-label"></div></div>
     <div class="mft"><div style="flex:1;min-width:260px"><div class="mdesc" id="mdesc"></div><details class="report-details" id="report-wrap" style="display:none"><summary>제작 과정 보고서 보기</summary><div class="report-box" id="mreport"></div></details></div><div class="mac" id="mac"></div></div>
   </div>
 </div>
@@ -1088,14 +1114,52 @@ function setDevice(type) {
   applyModalDevice(type);
 }
 
+function getModalVirtualSize(type) {
+  if (type === "mobile") return { w: 390, h: 760 };
+  if (type === "tablet") return { w: 768, h: 1024 };
+  return { w: 1000, h: 620 };
+}
+
+function fitModalFrame() {
+  var frame = document.getElementById("modal-frame");
+  var body = document.querySelector(".modal .mbody");
+  var label = document.getElementById("modal-scale-label");
+  if (!frame || !body) return;
+
+  var type = currentDevice || "pc";
+  var v = getModalVirtualSize(type);
+  var rect = body.getBoundingClientRect();
+  var cw = Math.max(1, rect.width);
+  var ch = Math.max(1, rect.height);
+  var scale = Math.min(cw / v.w, ch / v.h);
+
+  // 너무 작게 줄어드는 것을 막되, 컨테이너를 넘지 않게 유지
+  scale = Math.min(1, Math.max(0.32, scale));
+
+  frame.style.width = v.w + "px";
+  frame.style.height = v.h + "px";
+  frame.style.position = "absolute";
+  frame.style.left = "50%";
+  frame.style.top = "50%";
+  frame.style.transformOrigin = "top left";
+  frame.style.transform = "translate(" + (-v.w * scale / 2) + "px," + (-v.h * scale / 2) + "px) scale(" + scale + ")";
+
+  if (label) {
+    label.textContent = type.toUpperCase() + " · " + Math.round(scale * 100) + "%";
+  }
+}
+
 function applyModalDevice(type) {
+  currentDevice = type || currentDevice || "pc";
   var modal = document.querySelector(".modal");
   if (!modal) return;
   modal.classList.remove("dev-pc", "dev-tablet", "dev-mobile");
-  modal.classList.add("dev-" + type);
+  modal.classList.add("dev-" + currentDevice);
   document.querySelectorAll(".mdev .btn").forEach(function(b) { b.classList.remove("on"); });
-  var btn = document.getElementById("mdev-" + type);
+  var btn = document.getElementById("mdev-" + currentDevice);
   if (btn) btn.classList.add("on");
+
+  setTimeout(fitModalFrame, 60);
 }
 
 function setModalDevice(type) {
@@ -2182,9 +2246,32 @@ function initPreviewResizer() {
 (function showBuildMarker(){
   function ready(){
     var el = document.createElement("div");
-    el.textContent = "build 2026-06-08-ios-srcdoc-v8";
+    el.textContent = "build 2026-06-08-modal-scale-v9";
     el.style.cssText = "position:fixed;left:8px;bottom:6px;z-index:99999;font:10px monospace;color:rgba(136,146,164,.5);pointer-events:none";
     document.body.appendChild(el);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
+  else ready();
+})();
+
+
+
+(function initModalScaleResize(){
+  function ready(){
+    window.addEventListener("resize", function(){
+      clearTimeout(window.__rpModalScaleTimer);
+      window.__rpModalScaleTimer = setTimeout(fitModalFrame, 120);
+    });
+    window.addEventListener("orientationchange", function(){
+      setTimeout(fitModalFrame, 300);
+    });
+    if (window.ResizeObserver) {
+      var body = document.querySelector(".modal .mbody");
+      if (body) {
+        var ro = new ResizeObserver(function(){ fitModalFrame(); });
+        ro.observe(body);
+      }
+    }
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
   else ready();
