@@ -1126,37 +1126,63 @@ function adminLogout() {
 function setFrameSrcdoc(frame, code) {
   if (!frame) return;
 
-  // GitHub Pages 등 실제 웹주소 환경에서 srcdoc가 간헐적으로 비어 보이는 문제를 줄이기 위해
-  // Blob URL 방식으로 먼저 실행하고, 실패할 때만 srcdoc 방식으로 되돌립니다.
-  try {
-    if (frame._rpBlobUrl) {
-      URL.revokeObjectURL(frame._rpBlobUrl);
-      frame._rpBlobUrl = null;
+  var htmlCode = String(code || "");
+
+  if (!htmlCode.trim()) {
+    htmlCode = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body style='margin:0;background:#0a0e1a;color:#8892a4;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh'>표시할 코드가 없습니다.</body></html>";
+  }
+
+  if (!/<!doctype|<html[\s>]/i.test(htmlCode)) {
+    htmlCode = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" + htmlCode + "</body></html>";
+  }
+
+  var ua = navigator.userAgent || "";
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+  var preferSrcdoc = isIOS || isSafari;
+
+  function runWithSrcdoc() {
+    try {
+      if (frame._rpBlobUrl) {
+        URL.revokeObjectURL(frame._rpBlobUrl);
+        frame._rpBlobUrl = null;
+      }
+      frame.removeAttribute("src");
+      frame.src = "about:blank";
+      frame.srcdoc = "";
+      setTimeout(function() {
+        frame.srcdoc = htmlCode;
+      }, 30);
+      return true;
+    } catch (err) {
+      return false;
     }
+  }
 
-    var htmlCode = String(code || "");
-
-    // 기본 HTML 구조가 없어도 실행되도록 보정
-    if (!/<!doctype|<html[\s>]/i.test(htmlCode)) {
-      htmlCode = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>" + htmlCode + "</body></html>";
+  function runWithBlob() {
+    try {
+      if (frame._rpBlobUrl) {
+        URL.revokeObjectURL(frame._rpBlobUrl);
+        frame._rpBlobUrl = null;
+      }
+      var blob = new Blob([htmlCode], { type: "text/html;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      frame._rpBlobUrl = url;
+      frame.removeAttribute("srcdoc");
+      frame.src = "about:blank";
+      setTimeout(function() {
+        frame.src = url;
+      }, 30);
+      return true;
+    } catch (err) {
+      return false;
     }
+  }
 
-    var blob = new Blob([htmlCode], { type: "text/html;charset=utf-8" });
-    var url = URL.createObjectURL(blob);
-    frame._rpBlobUrl = url;
-
-    frame.removeAttribute("srcdoc");
-    frame.src = "about:blank";
-
-    setTimeout(function() {
-      frame.src = url;
-    }, 30);
-  } catch (err) {
-    frame.src = "about:blank";
-    frame.srcdoc = "";
-    setTimeout(function() {
-      frame.srcdoc = String(code || "");
-    }, 30);
+  if (preferSrcdoc) {
+    if (!runWithSrcdoc()) runWithBlob();
+  } else {
+    if (!runWithBlob()) runWithSrcdoc();
   }
 }
 
@@ -1494,7 +1520,13 @@ function openM(id) {
       reportWrap.style.display = "none";
     }
 
-    setFrameSrcdoc(document.getElementById("modal-frame"), openP.code || "");
+    if (!openP.code || !String(openP.code).trim()) {
+      setFrameSrcdoc(document.getElementById("modal-frame"), "<!DOCTYPE html><html><body style='margin:0;background:#0a0e1a;color:#f87171;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:10px'><div>작품 코드를 불러오지 못했습니다.</div><small>Apps Script의 getPostDetail 응답을 확인해주세요.</small></body></html>");
+    } else if (isIOSSafariLike()) {
+      setFrameSrcdoc(document.getElementById("modal-frame"), mobileFallbackHtml(openP.id, openP.title || ""));
+    } else {
+      setFrameSrcdoc(document.getElementById("modal-frame"), openP.code);
+    }
     applyModalDevice(currentDevice);
     setMac();
   }).catch(function(e) {
@@ -1511,6 +1543,7 @@ function setMac() {
     + '<button class="btn" id="mdev-tablet" onclick="setModalDevice(\'tablet\')">태블릿</button>'
     + '<button class="btn" id="mdev-mobile" onclick="setModalDevice(\'mobile\')">모바일</button></div>'
     + '<button class="btn brun" id="mac-fullscreen" style="font-size:11px">⛶ 전체화면</button>'
+    + '<button class="btn" id="mac-open-page" style="font-size:11px">📱 새 화면 실행</button>'
     + '<button class="btn" id="mac-report" style="font-size:11px">📄 제작 과정</button>'
     + '<button class="btn" id="mac-dl" style="font-size:11px">⬇ 다운로드</button>'
     + '<button class="btn" id="mac-qr" style="font-size:11px">📱 QR</button>';
@@ -1526,6 +1559,7 @@ function setMac() {
   applyModalDevice(currentDevice);
 
   var fsBtn = document.getElementById("mac-fullscreen");
+  var pageBtn = document.getElementById("mac-open-page");
   var reportBtn = document.getElementById("mac-report");
   var dlBtn = document.getElementById("mac-dl");
   var qrBtn = document.getElementById("mac-qr");
@@ -1534,6 +1568,7 @@ function setMac() {
   var delBtn = document.getElementById("mac-del");
 
   if (fsBtn) fsBtn.addEventListener("click", openPostFs);
+  if (pageBtn) pageBtn.addEventListener("click", function(){ if(openP) openPostFullPage(openP.id); });
   if (reportBtn) reportBtn.addEventListener("click", showPublicReport);
   if (dlBtn) dlBtn.addEventListener("click", downloadCode);
   if (qrBtn) qrBtn.addEventListener("click", showQRforPost);
@@ -1542,8 +1577,9 @@ function setMac() {
   if (delBtn) delBtn.addEventListener("click", function() { isAdmin ? adminDelete() : reqPw("delete"); });
 }
 function openPostFs() {
-  if (!openP || openP.code == null) {
-    alert("전체화면으로 볼 코드가 없습니다.");
+  if (!openP) return;
+  if (isIOSSafariLike()) {
+    openPostFullPage(openP.id);
     return;
   }
   setFrameSrcdoc(document.getElementById("fs-frame"), openP.code || "");
@@ -2179,6 +2215,34 @@ function initPreviewResizer() {
     initPreviewResizer();
   }
 })();
+
+
+
+function isIOSSafariLike() {
+  var ua = navigator.userAgent || "";
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
+  return isIOS && isSafari;
+}
+
+function openPostFullPage(postId) {
+  var url = makeBaseUrl() + "?post=" + encodeURIComponent(postId) + "&mode=full";
+  window.open(url, "_blank");
+}
+
+function mobileFallbackHtml(postId, title) {
+  var url = makeBaseUrl() + "?post=" + encodeURIComponent(postId) + "&mode=full";
+  return "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>"
+    + "body{margin:0;background:#0a0e1a;color:#e8edf5;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans KR',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;box-sizing:border-box;text-align:center}"
+    + ".box{max-width:420px}.icon{font-size:42px;margin-bottom:12px}.t{font-weight:800;font-size:18px;margin-bottom:8px}.p{color:#8892a4;line-height:1.55;font-size:14px;margin-bottom:18px}"
+    + "a,button{display:block;width:100%;box-sizing:border-box;border:0;border-radius:14px;padding:14px 16px;margin-top:10px;font-weight:800;font-size:15px;text-decoration:none}"
+    + "a{background:#00d4ff;color:#071019}button{background:#1a2235;color:#e8edf5}"
+    + "</style></head><body><div class='box'><div class='icon'>📱</div><div class='t'>아이폰에서는 새 화면으로 실행합니다</div>"
+    + "<div class='p'>Safari에서는 작품 실행창이 빈 화면으로 보일 수 있어요.<br>아래 버튼을 눌러 전체화면 실행 페이지로 열어주세요.</div>"
+    + "<a href='" + url.replace(/'/g, "%27") + "' target='_blank'>전체화면으로 실행</a>"
+    + "<button onclick=\"navigator.clipboard?navigator.clipboard.writeText('" + url.replace(/'/g, "%27") + "'):prompt('링크 복사', '" + url.replace(/'/g, "%27") + "')\">링크 복사</button>"
+    + "</div></body></html>";
+}
 
 </script>
 
