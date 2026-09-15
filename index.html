@@ -1496,7 +1496,7 @@ function adminLogin() {
   if (!pw) return;
   if (hpw(pw) === ADMIN_HASH) {
     isAdmin = true;
-    _aKey = pw; // 평문을 런타임 메모리에만 저장 (소스에 없음)
+    _aKey = hpw(pw); // 서버(code.gs)의 ADMIN_HASH와 비교되는 값이므로 해시로 저장해야 함
     document.getElementById("admin-badge").style.display = "flex";
     document.getElementById("admin-login-btn").style.display = "none";
     if (openP) setMac();
