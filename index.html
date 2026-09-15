@@ -1667,54 +1667,59 @@ function getGalleryQueryKey() {
   return JSON.stringify({ tag: curF || "all", q: q, sort: sort });
 }
 
+// Reuse gallery pages for one minute, with separate entries for each filter/search/sort.
+var galleryCache = new Map(), galleryPending = new Map();
+var galleryEpoch = 0, galleryTTL = 60000;
+function invalidateGallery() {
+  galleryEpoch++; galleryCache.clear(); galleryPending.clear();
+}
 function loadPosts(reset) {
-  var grid = document.getElementById("gg");
-  if (!grid) return;
-  if (isLoadingPosts) return;
-
-  var key = getGalleryQueryKey();
-  if (reset !== false || key !== lastListKey) {
-    posts = [];
-    nextOffset = 0;
-    hasMorePosts = true;
-    lastListKey = key;
-    grid.innerHTML = '<div class="gallery-loading">갤러리 목록을 불러오는 중...</div>';
-  }
-
-  if (!hasMorePosts) {
+  var grid=document.getElementById('gg'); if(!grid)return;
+  var key=getGalleryQueryKey(), epoch=galleryEpoch;
+  var cached=galleryCache.get(key);
+  var fresh=cached && Date.now()-cached.time<galleryTTL;
+  var append=reset===false && key===lastListKey && !!cached && fresh;
+  lastListKey=key;
+  function display(entry) {
+    posts=entry.posts.slice();nextOffset=entry.nextOffset;hasMorePosts=entry.hasMore;
     renderG();
-    return;
   }
-
-  isLoadingPosts = true;
-
-  var q = (document.getElementById("search-input") ? document.getElementById("search-input").value : "").trim();
-  var sort = document.getElementById("sort-sel") ? document.getElementById("sort-sel").value : "latest";
-
-  apiFetch("POST", {
-    action: "listPosts",
-    offset: nextOffset,
-    limit: PAGE_SIZE,
-    tag: curF || "all",
-    q: q,
-    sort: sort
-  }).then(function(data) {
-    isLoadingPosts = false;
-
-    if (data.status !== "ok") {
-      grid.innerHTML = '<div class="gempty"><div class="ge">⚠️</div><p>갤러리 목록을 불러오지 못했습니다.</p><small>' + esc(data.message || "오류") + '</small></div>';
-      return;
-    }
-
-    var newPosts = data.posts || [];
-    posts = posts.concat(newPosts);
-    nextOffset = typeof data.nextOffset === "number" ? data.nextOffset : posts.length;
-    hasMorePosts = !!data.hasMore;
-
-    renderG();
-  }).catch(function(e) {
-    isLoadingPosts = false;
-    grid.innerHTML = '<div class="gempty"><div class="ge">⚠️</div><p>갤러리 연결 오류</p><small>' + esc(e.message || e) + '</small></div>';
+  if(cached)display(cached);
+  else {posts=[];nextOffset=0;hasMorePosts=true;grid.innerHTML='<div class="gallery-loading">갤러리 목록을 불러오는 중...</div>';}
+  if(fresh && !append){isLoadingPosts=false;return Promise.resolve();}
+  if(append && !cached.hasMore){isLoadingPosts=false;return Promise.resolve();}
+  var offset=append?cached.nextOffset:0;
+  var requestKey=JSON.stringify([epoch,key,offset]);
+  isLoadingPosts=true;
+  var pending=galleryPending.get(requestKey);
+  if(!pending){
+    var query=JSON.parse(key);
+    pending=apiFetch('POST',{action:'listPosts',offset:offset,limit:PAGE_SIZE,tag:query.tag,q:query.q,sort:query.sort})
+      .then(function(data){
+        if(data.status!=='ok')throw new Error(data.message||'목록을 불러오지 못했습니다.');
+        var combined=(append?cached.posts:[]).concat(data.posts||[]);
+        var seen=new Set(); combined=combined.filter(function(p){var id=String(p.id);if(seen.has(id))return false;seen.add(id);return true;});
+        var entry={posts:combined,nextOffset:typeof data.nextOffset==='number'?data.nextOffset:offset+(data.posts||[]).length,hasMore:!!data.hasMore,time:Date.now()};
+        if(epoch===galleryEpoch){
+          galleryCache.delete(key);galleryCache.set(key,entry);
+          if(galleryCache.size>20)galleryCache.delete(galleryCache.keys().next().value);
+        }
+        return entry;
+      }).finally(function(){if(galleryPending.get(requestKey)===pending)galleryPending.delete(requestKey);});
+    galleryPending.set(requestKey,pending);
+  }
+  var more=document.getElementById('more-posts-btn');if(more){more.disabled=true;more.textContent='불러오는 중...';}
+  return pending.then(function(entry){
+    if(epoch!==galleryEpoch||key!==getGalleryQueryKey()||key!==lastListKey)return;
+    isLoadingPosts=false;display(entry);
+  }).catch(function(error){
+    if(epoch!==galleryEpoch||key!==getGalleryQueryKey()||key!==lastListKey)return;
+    isLoadingPosts=false;
+    if(cached)display(cached);else grid.replaceChildren();
+    var notice=document.createElement('div');notice.className='gallery-more-wrap';notice.setAttribute('role','status');
+    var text=document.createElement('p');text.textContent=(cached?'기존 목록을 표시하고 있습니다. ':'')+'갤러리 연결 오류: '+error.message;
+    var retry=document.createElement('button');retry.className='btn';retry.textContent='다시 불러오기';
+    retry.onclick=function(){loadPosts(append?false:true);};notice.append(text,retry);grid.appendChild(notice);
   });
 }
 
@@ -1825,7 +1830,7 @@ function postToG() {
         st.textContent = "";
         document.getElementById("us").classList.remove("open");
         sp("gallery", document.getElementById("ntab-gallery"));
-        loadPosts(true);
+        invalidateGallery(); loadPosts(true);
       }, 700);
     } else { setSt(st, "오류: " + (data.message || "실패"), "r"); }
   }).catch(function(e) { document.getElementById("post-btn").disabled = false; setSt(st, "오류: " + e.message, "r"); });
@@ -1961,6 +1966,7 @@ function closeM(fromAddress) {
   var oldFrame=document.getElementById('modal-frame');
   var blank=oldFrame.cloneNode(false);blank.removeAttribute('srcdoc');blank.removeAttribute('src');oldFrame.replaceWith(blank);
   openP = null;
+  if (!posts.length) loadPosts(true);
   if (!fromAddress && new URLSearchParams(location.search).has('post')) history.pushState({}, '', makeBaseUrl());
 }
 function loadToRunner() { if (!openP) return; document.getElementById("code-input").value = openP.code || ""; closeM(); sp("runner", document.getElementById("ntab-runner")); runCode(); }
@@ -2111,7 +2117,7 @@ function confPw() {
     if (!confirm('"' + (openP.title || "") + '"을(를) 삭제할까요?')) return;
     closePwM();
     apiFetch("POST", { action: "delete", id: openP.id, pwHash: pwHash }).then(function(data) {
-      if (data.status === "ok") { closeM(); loadPosts(true); } else { alert("오류: " + (data.message || "삭제 실패")); }
+      if (data.status === "ok") { closeM(); invalidateGallery(); loadPosts(true); } else { alert("오류: " + (data.message || "삭제 실패")); }
     });
   } else if (pwAct === "edit") {
     closePwM();
@@ -2194,7 +2200,7 @@ function saveEditForm(pwHash) {
       st.textContent = "✓ 수정 완료";
       closeEditForm();
       closeM();
-      loadPosts(true);
+      invalidateGallery(); loadPosts(true);
     } else {
       st.style.color = "var(--red)";
       st.textContent = "오류: " + (data.message || "수정 실패");
@@ -2214,7 +2220,7 @@ function adminDelete() {
   if (!openP || !isAdmin) return;
   if (!confirm('"' + (openP.title || "") + '"을(를) 삭제할까요?')) return;
   apiFetch("POST", { action: "delete", id: openP.id, pwHash: "ADMIN", adminPw: _aKey || "" }).then(function(data) {
-    if (data.status === "ok") { closeM(); loadPosts(true); } else { alert("오류: " + (data.message || "삭제 실패")); }
+    if (data.status === "ok") { closeM(); invalidateGallery(); loadPosts(true); } else { alert("오류: " + (data.message || "삭제 실패")); }
   });
 }
 
@@ -2466,6 +2472,8 @@ function goHomeGallery() {
 
 (function initStartOnGallery(){
   function readyStartGallery() {
+    var initialParams=new URLSearchParams(location.search);
+    if(initialParams.get('post'))return;
     if (location.hash && location.hash.indexOf("runner") >= 0) return;
     var tab = document.getElementById("ntab-gallery");
     if (typeof sp === "function") {
@@ -2477,25 +2485,6 @@ function goHomeGallery() {
     document.addEventListener("DOMContentLoaded", readyStartGallery);
   } else {
     setTimeout(readyStartGallery, 0);
-  }
-})();
-
-
-
-function startAtGallerySafely() {
-  var galleryTab = document.getElementById("ntab-gallery");
-  if (typeof sp === "function") {
-    sp("gallery", galleryTab || null);
-  }
-}
-
-(function initStartAtGallerySafely(){
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function(){
-      setTimeout(startAtGallerySafely, 50);
-    });
-  } else {
-    setTimeout(startAtGallerySafely, 50);
   }
 })();
 
