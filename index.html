@@ -1136,7 +1136,7 @@ body.device-mobile .app{
 }
 
 </style>
-</head>
+<style>.card-share-actions{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 14px}.card-share-actions .btn{font-size:12px;min-height:40px;text-decoration:none}.qr-box{max-width:calc(100vw - 24px);box-sizing:border-box}.qr-url{overflow-wrap:anywhere}</style></head>
 <body>
 <header>
   <div class="brand-home" onclick="goHomeGallery()" title="갤러리로 이동">
@@ -1278,7 +1278,7 @@ AI에게 이렇게 요청해보세요:
         <select class="sort-sel" id="sort-sel" onchange="loadPosts(true)">
           <option value="latest">최신순</option><option value="views">조회수순</option><option value="title">제목순</option>
         </select>
-        <button class="btn" onclick="showQR(location.href,'홈페이지 QR','Real Physics 홈페이지')" style="font-size:11px;padding:6px 10px">&#128241; QR</button>
+        <button class="btn" onclick="showQR(makeBaseUrl(),'홈페이지 QR','Real Physics 홈페이지')" style="font-size:11px;padding:6px 10px">&#128241; QR</button>
       </div>
     </div>
     <div class="subtabs">
@@ -1502,6 +1502,11 @@ function adminLogout() {
 
 function setFrameSrcdoc(frame, code) {
   if (!frame) return;
+  if (frame.id === 'modal-frame') {
+    var fresh = frame.cloneNode(false);
+    fresh.removeAttribute('src'); fresh.removeAttribute('srcdoc');
+    frame.replaceWith(fresh); frame = fresh;
+  }
 
   var htmlCode = String(code || "");
 
@@ -1756,6 +1761,16 @@ function renderG() {
 
   grid.querySelectorAll(".card").forEach(function(card) {
     card.addEventListener("click", function() { openM(this.getAttribute("data-id")); });
+    var id=card.getAttribute('data-id');
+    var item=list.find(function(p){return String(p.id)===id;});
+    var actions=document.createElement('div'); actions.className='card-share-actions';
+    var link=document.createElement('a');link.className='btn';link.textContent='실험 열기';link.href=postUrl(id);
+    link.addEventListener('click',function(e){e.stopPropagation();if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.altKey){e.preventDefault();openM(id);}});
+    var copy=document.createElement('button');copy.className='btn';copy.textContent='🔗 주소 복사';
+    copy.addEventListener('click',function(e){e.stopPropagation();copyPostLink(id);});
+    var qr=document.createElement('button');qr.className='btn';qr.textContent='📱 QR';
+    qr.addEventListener('click',function(e){e.stopPropagation();showQR(postUrl(id),'실험 QR',item.title||'실험 바로 열기');});
+    actions.append(link,copy,qr);card.appendChild(actions);
   });
 
   var more = document.getElementById("more-posts-btn");
@@ -1817,12 +1832,24 @@ function postToG() {
 }
 function setSt(el, msg, t) { el.style.color = t === "r" ? "var(--red)" : "var(--green)"; el.textContent = msg; if (t === "r") setTimeout(function() { el.textContent = ""; }, 2500); }
 
-function openM(id) {
+var modalRequest = 0;
+function postUrl(id) { return makeBaseUrl() + '?post=' + encodeURIComponent(String(id)); }
+function copyPostLink(id) {
+  var url = postUrl(id);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function(){ alert('실험 주소를 복사했습니다.'); }, function(){ prompt('아래 실험 주소를 복사하세요.', url); });
+  } else { prompt('아래 실험 주소를 복사하세요.', url); }
+}
+function openM(id, fromAddress) {
+  var request = ++modalRequest;
+  if (!fromAddress && new URLSearchParams(location.search).get('post') !== String(id)) {
+    history.pushState({rpModal:true}, '', postUrl(id));
+  }
   var meta = null;
   for (var i = 0; i < posts.length; i++) {
     if (String(posts[i].id) === String(id)) { meta = posts[i]; break; }
   }
-  if (!meta) return;
+  if (!meta) meta = {id:id, title:"실험 불러오는 중..."};
 
   openP = meta;
   views[id] = (views[id] || Number(meta.views || 0) || 0) + 1;
@@ -1845,6 +1872,7 @@ function openM(id) {
   applyModalDevice(currentDevice);
 
   apiFetch("POST", { action: "getPostDetail", id: id }).then(function(data) {
+    if (request !== modalRequest) return;
     if (data.status !== "ok" || !data.post) {
       setFrameSrcdoc(document.getElementById("modal-frame"), "<!DOCTYPE html><html><body style='margin:0;background:#0a0e1a;color:#f87171;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh'>작품을 불러오지 못했습니다.</body></html>");
       if (mac) mac.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--red)">불러오기 실패</span>';
@@ -1872,6 +1900,7 @@ function openM(id) {
     applyModalDevice(currentDevice);
     setMac();
   }).catch(function(e) {
+    if (request !== modalRequest) return;
     setFrameSrcdoc(document.getElementById("modal-frame"), "<!DOCTYPE html><html><body style='margin:0;background:#0a0e1a;color:#f87171;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh'>연결 오류: " + esc(e.message || e) + "</body></html>");
     if (mac) mac.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--red)">연결 오류</span>';
   });
@@ -1911,6 +1940,9 @@ function setMac() {
   if (reportBtn) reportBtn.addEventListener("click", showPublicReport);
   if (dlBtn) dlBtn.addEventListener("click", downloadCode);
   if (qrBtn) qrBtn.addEventListener("click", showQRforPost);
+  var shareBtn = document.createElement('button'); shareBtn.className='btn'; shareBtn.textContent='🔗 주소 복사'; shareBtn.id='mac-share';
+  shareBtn.addEventListener('click',function(){if(openP)copyPostLink(openP.id);});
+  mac.insertBefore(shareBtn,qrBtn);
   if (aiBtn) aiBtn.addEventListener("click", showAiLog);
   if (editBtn) editBtn.addEventListener("click", function() { isAdmin ? openEditForm("ADMIN") : reqPw("edit"); });
   if (delBtn) delBtn.addEventListener("click", function() { isAdmin ? adminDelete() : reqPw("delete"); });
@@ -1923,7 +1955,14 @@ function openPostFs() {
   setFrameSrcdoc(document.getElementById("fs-frame"), openP.code || "");
   document.getElementById("fsov").classList.add("on");
 }
-function closeM() { document.getElementById("mbg").classList.remove("on"); document.getElementById("modal-frame").srcdoc = ""; openP = null; }
+function closeM(fromAddress) {
+  ++modalRequest;
+  document.getElementById("mbg").classList.remove("on");
+  var oldFrame=document.getElementById('modal-frame');
+  var blank=oldFrame.cloneNode(false);blank.removeAttribute('srcdoc');blank.removeAttribute('src');oldFrame.replaceWith(blank);
+  openP = null;
+  if (!fromAddress && new URLSearchParams(location.search).has('post')) history.pushState({}, '', makeBaseUrl());
+}
 function loadToRunner() { if (!openP) return; document.getElementById("code-input").value = openP.code || ""; closeM(); sp("runner", document.getElementById("ntab-runner")); runCode(); }
 function downloadCode() {
   if (!openP) return;
@@ -2008,7 +2047,7 @@ function showQR(url, title, desc) {
 }
 function showQRforPost() {
   if (!openP) return;
-  var fullUrl = makeBaseUrl() + "?post=" + encodeURIComponent(openP.id) + "&mode=full";
+  var fullUrl = postUrl(openP.id);
   showQR(fullUrl, "📱 시뮬레이션 QR", '"' + (openP.title || "") + '" — 스캔하면 바로 실행됩니다');
 }
 function closeQR() { document.getElementById("qr-bg").classList.remove("on"); }
@@ -2230,43 +2269,8 @@ function adminDelete() {
     });
 
   } else {
-    // ── 일반 모드: 갤러리로 이동 후 해당 작품 모달을 안정적으로 오픈 ──
-    // 기존 방식은 apiFetch를 나중에 감싸서 첫 loadPosts() 결과를 놓칠 수 있었음.
-    // 그래서 직접 게시글을 다시 불러온 뒤 renderG() → openM(pid) 순서로 실행한다.
-    sp("gallery", document.getElementById("ntab-gallery"));
-
-    var grid = document.getElementById("gg");
-    if (grid) {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text2);font-size:13px;opacity:.5">작품을 불러오는 중...</div>';
-    }
-
-    apiFetch("GET").then(function(data) {
-      if (data.status !== "ok") {
-        if (grid) {
-          grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--red);font-size:12px">작품을 불러오지 못했습니다.</div>';
-        }
-        return;
-      }
-
-      posts = data.posts || [];
-      renderG();
-
-      var exists = posts.some(function(p) { return String(p.id) === String(pid); });
-      if (!exists) {
-        if (grid) {
-          grid.insertAdjacentHTML("afterbegin", '<div style="grid-column:1/-1;text-align:center;padding:14px;color:var(--amber);font-size:12px;border:1px solid rgba(245,158,11,.25);border-radius:10px;margin-bottom:8px;background:rgba(245,158,11,.06)">QR 링크의 작품을 찾을 수 없습니다. 삭제되었거나 주소가 잘못되었을 수 있어요.</div>');
-        }
-        return;
-      }
-
-      setTimeout(function() {
-        openM(pid);
-      }, 120);
-    }).catch(function(e) {
-      if (grid) {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--red);font-size:12px">연결 오류: ' + esc(e.message || e) + '</div>';
-      }
-    });
+    // Fetch a shared experiment directly, including items beyond the first gallery page.
+    openM(pid, true);
   }
 })();
 // ──────────────────────────────────────────────────────────
@@ -2451,6 +2455,7 @@ function scrollToUploadSection() {
 
 
 function goHomeGallery() {
+  closeM();
   var tab = document.getElementById("ntab-gallery");
   sp("gallery", tab || undefined);
   if (typeof closeMob === "function") closeMob();
@@ -2704,5 +2709,11 @@ function syncMobileUtilityRow() {
 
 <button class="mobile-scroll-upload" id="mobile-scroll-upload" onclick="scrollToUploadSection()" type="button">등록하기 ↓</button>
 
-</body>
-</html>
+<script>
+window.addEventListener('popstate',function(){
+  closeQR(); closeFs();
+  var p=new URLSearchParams(location.search);
+  if(p.get('mode')==='full'){location.reload();return;}
+  if(p.get('post'))openM(p.get('post'),true); else closeM(true);
+});
+</script></body></html>
