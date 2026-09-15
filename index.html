@@ -220,6 +220,7 @@ body.light-mode{
   background:#f4f7fb;
   color:var(--text);
 }
+body.light-mode header,
 body.light-mode .topbar,
 body.light-mode .panel-head,
 body.light-mode .modal-head,
@@ -286,6 +287,13 @@ body.light-mode small{
 body.light-mode .theme-toggle{
   background:#ffffff;
   border-color:#cbd5e1;
+  color:#172033;
+}
+body.light-mode .dbtn:not(.adev){
+  border-color:#cbd5e1;
+  color:#172033;
+}
+body.light-mode .ham{
   color:#172033;
 }
 .theme-toggle{
@@ -1228,7 +1236,12 @@ AI에게 이렇게 요청해보세요:
             <option value="역학">역학</option><option value="전기">전기&#183;자기</option>
             <option value="파동">파동&#183;광학</option><option value="열역학">열역학</option>
             <option value="광학">광학</option><option value="기타">기타</option>
-            <option value="교사자료">&#128104;&#8205;&#127979; 교사 자료</option>
+          </select>
+        </div>
+        <div class="fg"><label>구분</label>
+          <select id="urole">
+            <option value="student">학생 작품</option>
+            <option value="teacher">&#128104;&#8205;&#127979; 교사 작품</option>
           </select>
         </div>
         <div class="fg"><label>비밀번호 * <span style="opacity:.45;font-size:9px">(수정&#183;삭제용)</span></label>
@@ -1283,7 +1296,7 @@ AI에게 이렇게 요청해보세요:
     </div>
     <div class="subtabs">
       <button class="nav-tab active" id="subtab-student" onclick="switchSub('student',this)" style="font-size:12px;padding:6px 14px">학생 작품</button>
-      <button class="nav-tab" id="subtab-teacher" onclick="switchSub('teacher',this)" style="font-size:12px;padding:6px 14px">교사 추천 <span style="font-size:10px;opacity:.4">(준비중)</span></button>
+      <button class="nav-tab" id="subtab-teacher" onclick="switchSub('teacher',this)" style="font-size:12px;padding:6px 14px">&#128104;&#8205;&#127979; 교사 작품</button>
     </div>
     <div class="frow">
       <button class="fbtn on" onclick="filterG('all',this)">전체</button>
@@ -1293,10 +1306,8 @@ AI에게 이렇게 요청해보세요:
       <button class="fbtn" onclick="filterG('열역학',this)">열역학</button>
       <button class="fbtn" onclick="filterG('광학',this)">광학</button>
       <button class="fbtn" onclick="filterG('기타',this)">기타</button>
-      <button class="fbtn" onclick="filterG('교사자료',this)">&#128104;&#8205;&#127979; 교사 자료</button>
     </div>
     <div id="sub-student"><div class="gg" id="gg"></div></div>
-    <div id="sub-teacher" style="display:none"><div class="gempty"><div class="ge">&#128104;&#8205;&#127979;</div><p>교사 추천 콘텐츠가 곧 추가됩니다</p></div></div>
   </div>
 </div>
 </div>
@@ -1661,10 +1672,12 @@ function checkSensitiveBeforeSubmit(code, aiLog, publicReport) {
 }
 function loadEx(i) { document.getElementById("code-input").value = EX[i]; runCode(); }
 
+var curRole = "student"; // 갤러리 탭: 'student'(학생 작품) 또는 'teacher'(교사 작품)
+
 function getGalleryQueryKey() {
   var q = (document.getElementById("search-input") ? document.getElementById("search-input").value : "").trim();
   var sort = document.getElementById("sort-sel") ? document.getElementById("sort-sel").value : "latest";
-  return JSON.stringify({ tag: curF || "all", q: q, sort: sort });
+  return JSON.stringify({ role: curRole, tag: curF || "all", q: q, sort: sort });
 }
 
 // Reuse gallery pages for one minute, with separate entries for each filter/search/sort.
@@ -1694,7 +1707,7 @@ function loadPosts(reset) {
   var pending=galleryPending.get(requestKey);
   if(!pending){
     var query=JSON.parse(key);
-    pending=apiFetch('POST',{action:'listPosts',offset:offset,limit:PAGE_SIZE,tag:query.tag,q:query.q,sort:query.sort})
+    pending=apiFetch('POST',{action:'listPosts',offset:offset,limit:PAGE_SIZE,role:query.role,tag:query.tag,q:query.q,sort:query.sort})
       .then(function(data){
         if(data.status!=='ok')throw new Error(data.message||'목록을 불러오지 못했습니다.');
         var combined=(append?cached.posts:[]).concat(data.posts||[]);
@@ -1736,9 +1749,10 @@ function renderG() {
   if (!list.length) {
     var q = (document.getElementById("search-input") ? document.getElementById("search-input").value : "").trim();
     var ei = curF === "all" ? "🔭" : "🔍";
-    var em = q ? '"' + esc(q) + '" 검색 결과가 없어요.' : curF === "all" ? "아직 작품이 없어요. 실행기에서 올려보세요!" : "이 단원의 작품이 없어요.";
-    grid.innerHTML = '<div class="gempty"><div class="ge">' + ei + '</div><p>' + em + '</p>' + (!q && curF === "all" ? '<button class="btn brun" id="go-runner-btn">실행기로 가기</button>' : "") + "</div>";
-    if (!q && curF === "all") {
+    var noticeWhenEmpty = curRole === "teacher" ? "아직 등록된 교사 작품이 없어요." : "아직 작품이 없어요. 실행기에서 올려보세요!";
+    var em = q ? '"' + esc(q) + '" 검색 결과가 없어요.' : curF === "all" ? noticeWhenEmpty : "이 단원의 작품이 없어요.";
+    grid.innerHTML = '<div class="gempty"><div class="ge">' + ei + '</div><p>' + em + '</p>' + (!q && curF === "all" && curRole === "student" ? '<button class="btn brun" id="go-runner-btn">실행기로 가기</button>' : "") + "</div>";
+    if (!q && curF === "all" && curRole === "student") {
       var rb = document.getElementById("go-runner-btn");
       if (rb) rb.addEventListener("click", function() { sp("runner", document.getElementById("ntab-runner")); });
     }
@@ -1795,12 +1809,11 @@ function filterG(tag, btn) {
   if (btn) btn.classList.add("on");
   loadPosts(true);
 }
-function switchSub(id, btn) {
-  document.querySelectorAll("[id^='sub-']").forEach(function(el) { el.style.display = "none"; });
+function switchSub(role, btn) {
+  curRole = role;
   document.querySelectorAll("[id^='subtab-']").forEach(function(b) { b.classList.remove("active"); });
-  document.getElementById("sub-" + id).style.display = "block";
   btn.classList.add("active");
-  if (id === "student") loadPosts(true);
+  loadPosts(true);
 }
 
 function postToG() {
@@ -1808,6 +1821,7 @@ function postToG() {
   var title = document.getElementById("utitle").value.trim();
   var author = document.getElementById("uauthor").value.trim() || "익명";
   var tag = document.getElementById("utag").value;
+  var role = document.getElementById("urole") ? document.getElementById("urole").value : "student";
   var desc = document.getElementById("udesc").value.trim();
   var aiLog = document.getElementById("uailog") ? document.getElementById("uailog").value.trim() : "";
   var publicReport = document.getElementById("upublicreport") ? document.getElementById("upublicreport").value.trim() : "";
@@ -1821,7 +1835,7 @@ function postToG() {
   if (!checkSensitiveBeforeSubmit(code, aiLog, publicReport)) { setSt(st, "민감정보 의심 항목을 확인해주세요", "r"); return; }
   setSt(st, "업로드 중...", "g");
   document.getElementById("post-btn").disabled = true;
-  apiFetch("POST", { action: "add", title: title, author: author, tag: tag, desc: desc, code: code, aiLog: aiLog, publicReport: publicReport, pwHash: hpw(pw) }).then(function(data) {
+  apiFetch("POST", { action: "add", title: title, author: author, tag: tag, role: role, desc: desc, code: code, aiLog: aiLog, publicReport: publicReport, pwHash: hpw(pw) }).then(function(data) {
     document.getElementById("post-btn").disabled = false;
     if (data.status === "ok") {
       setSt(st, "✓ 업로드 완료! 갤러리로 이동합니다.", "g");
@@ -1830,7 +1844,10 @@ function postToG() {
         st.textContent = "";
         document.getElementById("us").classList.remove("open");
         sp("gallery", document.getElementById("ntab-gallery"));
-        invalidateGallery(); loadPosts(true);
+        invalidateGallery();
+        curRole = role;
+        var targetTab = document.getElementById(role === "teacher" ? "subtab-teacher" : "subtab-student");
+        if (targetTab) switchSub(role, targetTab); else loadPosts(true);
       }, 700);
     } else { setSt(st, "오류: " + (data.message || "실패"), "r"); }
   }).catch(function(e) { document.getElementById("post-btn").disabled = false; setSt(st, "오류: " + e.message, "r"); });
@@ -2142,6 +2159,19 @@ function openEditForm(pwHash) {
     + '  <div style="padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;border-bottom:1px solid var(--border)">'
     + '    <div class="fg"><label>제목 *</label><input id="edit-title" type="text"></div>'
     + '    <div class="fg"><label>설명</label><input id="edit-desc" type="text"></div>'
+    + '    <div class="fg"><label>단원 / 태그</label>'
+    + '      <select id="edit-tag">'
+    + '        <option value="역학">역학</option><option value="전기">전기&#183;자기</option>'
+    + '        <option value="파동">파동&#183;광학</option><option value="열역학">열역학</option>'
+    + '        <option value="광학">광학</option><option value="기타">기타</option>'
+    + '      </select>'
+    + '    </div>'
+    + '    <div class="fg"><label>구분</label>'
+    + '      <select id="edit-role">'
+    + '        <option value="student">학생 작품</option>'
+    + '        <option value="teacher">&#128104;&#8205;&#127979; 교사 작품</option>'
+    + '      </select>'
+    + '    </div>'
     + '    <div class="fg" style="grid-column:1/-1"><label>공개용 제작 과정 보고서</label><textarea id="edit-public-report" style="min-height:90px"></textarea></div>'
     + '  </div>'
     + '  <textarea id="edit-code" spellcheck="false" style="flex:1;width:100%;background:var(--bg4);color:#cdd9e5;border:none;outline:none;font-family:var(--mono);font-size:12.5px;line-height:1.7;padding:14px 16px;resize:none;tab-size:2"></textarea>'
@@ -2154,6 +2184,8 @@ function openEditForm(pwHash) {
 
   document.getElementById("edit-title").value = openP.title || "";
   document.getElementById("edit-desc").value = openP.desc || "";
+  document.getElementById("edit-tag").value = openP.tag || "기타";
+  document.getElementById("edit-role").value = openP.role || "student";
   document.getElementById("edit-public-report").value = openP.publicReport || "";
   document.getElementById("edit-code").value = openP.code || "";
   document.getElementById("edit-close").onclick = closeEditForm;
@@ -2184,6 +2216,8 @@ function saveEditForm(pwHash) {
   if (!openP) return;
   var title = document.getElementById("edit-title").value.trim();
   var desc = document.getElementById("edit-desc").value.trim();
+  var tag = document.getElementById("edit-tag").value;
+  var role = document.getElementById("edit-role").value;
   var publicReport = document.getElementById("edit-public-report").value.trim();
   var code = document.getElementById("edit-code").value;
   var st = document.getElementById("edit-status");
@@ -2194,7 +2228,7 @@ function saveEditForm(pwHash) {
   st.style.color = "var(--green)";
   st.textContent = "저장 중...";
   document.getElementById("edit-save").disabled = true;
-  apiFetch("POST", { action: "edit", id: openP.id, pwHash: pwHash, title: title, desc: desc, code: code, publicReport: publicReport, adminPw: _aKey || "" }).then(function(data) {
+  apiFetch("POST", { action: "edit", id: openP.id, pwHash: pwHash, title: title, desc: desc, tag: tag, role: role, code: code, publicReport: publicReport, adminPw: _aKey || "" }).then(function(data) {
     document.getElementById("edit-save").disabled = false;
     if (data.status === "ok") {
       st.textContent = "✓ 수정 완료";
