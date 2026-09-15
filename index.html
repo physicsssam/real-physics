@@ -12,7 +12,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100vh;overflow:hidden;display:flex;flex-direction:column}
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;z-index:0}
-header{position:relative;z-index:50;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:rgba(10,14,26,.92);backdrop-filter:blur(16px)}
+header{position:relative;z-index:50;flex-shrink:0;display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:rgba(10,14,26,.92);backdrop-filter:blur(16px)}
 .logo-main{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent)}
 .logo-main span{color:var(--text2);font-weight:400}
 .logo-sub{font-size:10px;color:var(--text2);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
@@ -90,14 +90,14 @@ header{position:relative;z-index:50;flex-shrink:0;display:flex;align-items:cente
 #fs-frame{flex:1;border:none;background:#fff}
 .gw{flex:1;overflow-y:auto;padding:16px 24px}
 .gtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap}
-.gtop h2{font-size:18px;font-weight:700}
+.gtop h2{font-size:22px;font-weight:700}
 .g-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .search-wrap{position:relative}
-.search-wrap input{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:7px 14px 7px 34px;color:var(--text);font-size:12px;font-family:var(--sans);outline:none;transition:border-color .18s;width:180px}
-.search-wrap input:focus{border-color:var(--borderB);width:220px}
+.search-wrap input{background:var(--bg3);border:1px solid var(--border);border-radius:22px;padding:10px 16px 10px 38px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;transition:border-color .18s,width .18s;width:230px}
+.search-wrap input:focus{border-color:var(--borderB);width:270px}
 .search-wrap input::placeholder{color:var(--text2);opacity:.6}
-.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none;opacity:.6}
-.sort-sel{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text2);font-size:12px;font-family:var(--sans);outline:none;cursor:pointer}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:15px;pointer-events:none;opacity:.6}
+.sort-sel{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text2);font-size:14px;font-family:var(--sans);outline:none;cursor:pointer}
 .sort-sel option{background:var(--bg2)}
 .subtabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px}
 .frow{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px}
@@ -313,6 +313,16 @@ body.device-mobile .app{
 /* 태블릿: 좌우 2분할은 유지하되 여백과 높이를 줄여 화면 활용도를 높입니다. */
 @media (min-width: 769px) and (max-width: 1100px){
   body{font-size:14px;}
+  header{
+    gap:8px!important;
+    padding:10px 12px!important;
+    flex-wrap:nowrap!important;
+  }
+  header .logo-main{font-size:14px!important}
+  header .logo-sub{display:none!important}
+  header .nav-tab{font-size:12px!important;padding:6px 9px!important;white-space:nowrap!important}
+  header .dbtn{font-size:11px!important;padding:4px 6px!important}
+  header #admin-login-btn{font-size:10px!important;padding:5px 8px!important;white-space:nowrap!important}
   .topbar{
     gap:8px!important;
     padding:10px 12px!important;
@@ -1287,16 +1297,16 @@ AI에게 이렇게 요청해보세요:
     <div class="gtop">
       <h2>갤러리</h2>
       <div class="g-controls">
-        <div class="search-wrap"><span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="제목 검색..." oninput="loadPostsDebounced()"></div>
+        <div class="search-wrap"><span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="제목 또는 제작자 검색..." oninput="loadPostsDebounced()"></div>
         <select class="sort-sel" id="sort-sel" onchange="loadPosts(true)">
           <option value="latest">최신순</option><option value="views">조회수순</option><option value="title">제목순</option>
         </select>
-        <button class="btn" onclick="showQR(makeBaseUrl(),'홈페이지 QR','Real Physics 홈페이지')" style="font-size:11px;padding:6px 10px">&#128241; QR</button>
+        <button class="btn" onclick="showQR(makeBaseUrl(),'홈페이지 QR','Real Physics 홈페이지')" style="font-size:13px;padding:9px 16px">&#128241; QR</button>
       </div>
     </div>
     <div class="subtabs">
-      <button class="nav-tab active" id="subtab-student" onclick="switchSub('student',this)" style="font-size:12px;padding:6px 14px">학생 작품</button>
-      <button class="nav-tab" id="subtab-teacher" onclick="switchSub('teacher',this)" style="font-size:12px;padding:6px 14px">&#128104;&#8205;&#127979; 교사 작품</button>
+      <button class="nav-tab active" id="subtab-student" onclick="switchSub('student',this)" style="font-size:15px;padding:9px 18px">학생 작품</button>
+      <button class="nav-tab" id="subtab-teacher" onclick="switchSub('teacher',this)" style="font-size:15px;padding:9px 18px">&#128104;&#8205;&#127979; 교사 작품</button>
     </div>
     <div class="frow">
       <button class="fbtn on" onclick="filterG('all',this)">전체</button>
