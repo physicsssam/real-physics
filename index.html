@@ -12,7 +12,8 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100vh;overflow:hidden;display:flex;flex-direction:column}
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;z-index:0}
-header{position:relative;z-index:50;flex-shrink:0;display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:rgba(10,14,26,.92);backdrop-filter:blur(16px)}
+header{position:relative;z-index:50;flex-shrink:0;display:flex;flex-wrap:nowrap;align-items:center;gap:24px;padding:12px 24px;border-bottom:1px solid var(--border);background:rgba(10,14,26,.92);backdrop-filter:blur(16px)}
+header .hright{margin-left:auto}
 .logo-main{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent)}
 .logo-main span{color:var(--text2);font-weight:400}
 .logo-sub{font-size:10px;color:var(--text2);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
@@ -91,16 +92,25 @@ header{position:relative;z-index:50;flex-shrink:0;display:flex;flex-wrap:nowrap;
 .gw{flex:1;overflow-y:auto;padding:16px 24px}
 .gtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap}
 .gtop h2{font-size:22px;font-weight:700}
+
+/* ===== 갤러리 상단: 왼쪽(제목+탭+검색/정렬+필터) / 오른쪽(상시 QR) ===== */
+.ghero{display:grid;grid-template-columns:1fr 220px;gap:0;margin-bottom:16px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.ghero-left{padding:16px 18px;min-width:0}
+.gtoprow{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.gtoprow h2{font-size:22px;font-weight:800;white-space:nowrap;margin:0}
+.ghero-qr{background:var(--bg2);border-left:1px solid var(--border);display:flex;align-items:center;justify-content:center;padding:14px}
+.ghero-qr canvas,.ghero-qr img{border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+
 .g-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .search-wrap{position:relative}
-.search-wrap input{background:var(--bg3);border:1px solid var(--border);border-radius:22px;padding:10px 16px 10px 38px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;transition:border-color .18s,width .18s;width:230px}
-.search-wrap input:focus{border-color:var(--borderB);width:270px}
+.search-wrap input{background:var(--bg3);border:1px solid var(--border);border-radius:22px;padding:10px 16px 10px 38px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;transition:border-color .18s,width .18s;width:200px}
+.search-wrap input:focus{border-color:var(--borderB);width:230px}
 .search-wrap input::placeholder{color:var(--text2);opacity:.6}
 .search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:15px;pointer-events:none;opacity:.6}
 .sort-sel{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text2);font-size:14px;font-family:var(--sans);outline:none;cursor:pointer}
 .sort-sel option{background:var(--bg2)}
-.subtabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px}
-.frow{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px}
+.subtabs{display:flex;gap:8px}
+.frow{display:flex;gap:5px;flex-wrap:wrap}
 .fbtn{font-size:12px;padding:5px 12px;border-radius:18px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .18s;font-family:var(--sans)}
 .fbtn:hover,.fbtn.on{border-color:var(--borderB);color:var(--accent);background:rgba(0,212,255,.06)}
 .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:13px}
@@ -117,6 +127,7 @@ header{position:relative;z-index:50;flex-shrink:0;display:flex;flex-wrap:nowrap;
 .tag-전기{color:#f59e0b;border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.06)}
 .tag-파동{color:#a78bfa;border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.06)}
 .tag-열역학{color:#f87171;border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.06)}
+.tag-현대물리{color:#10b981;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.06)}
 .tag-광학{color:#10b981;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.06)}
 .tag-기타{color:#8892a4;border-color:rgba(136,146,164,.3);background:rgba(136,146,164,.06)}
 .tag-교사자료{color:#f59e0b;border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.06)}
@@ -1083,6 +1094,12 @@ body.device-mobile .app{
 
 
 
+/* ===== 좁은 화면: 갤러리 히어로(제목+탭+검색 / QR)를 세로로 쌓음 ===== */
+@media (max-width:900px){
+  .ghero{grid-template-columns:1fr!important}
+  .ghero-qr{border-left:none!important;border-top:1px solid var(--border)!important;padding:16px!important}
+}
+
 /* ===== Device buttons as text labels ===== */
 .dbtn{
   font-family:var(--sans)!important;
@@ -1245,7 +1262,7 @@ AI에게 이렇게 요청해보세요:
           <select id="utag">
             <option value="역학">역학</option><option value="전기">전기&#183;자기</option>
             <option value="파동">파동&#183;광학</option><option value="열역학">열역학</option>
-            <option value="광학">광학</option><option value="기타">기타</option>
+            <option value="현대물리">현대물리</option><option value="기타">기타</option>
           </select>
         </div>
         <div class="fg"><label>구분</label>
@@ -1294,28 +1311,34 @@ AI에게 이렇게 요청해보세요:
 
 <div id="page-gallery" class="page active">
   <div class="gw">
-    <div class="gtop">
-      <h2>갤러리</h2>
-      <div class="g-controls">
-        <div class="search-wrap"><span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="제목 또는 제작자 검색..." oninput="loadPostsDebounced()"></div>
-        <select class="sort-sel" id="sort-sel" onchange="loadPosts(true)">
-          <option value="latest">최신순</option><option value="views">조회수순</option><option value="title">제목순</option>
-        </select>
-        <button class="btn" onclick="showQR(makeBaseUrl(),'홈페이지 QR','Real Physics 홈페이지')" style="font-size:13px;padding:9px 16px">&#128241; QR</button>
+    <div class="ghero">
+      <div class="ghero-left">
+        <div class="gtoprow">
+          <h2>갤러리</h2>
+          <div class="subtabs">
+            <button class="nav-tab active" id="subtab-student" onclick="switchSub('student',this)" style="font-size:15px;padding:9px 18px">학생 작품</button>
+            <button class="nav-tab" id="subtab-teacher" onclick="switchSub('teacher',this)" style="font-size:15px;padding:9px 18px">&#128104;&#8205;&#127979; 교사 작품</button>
+          </div>
+          <div class="g-controls">
+            <div class="search-wrap"><span class="search-icon">&#128269;</span><input type="text" id="search-input" placeholder="제목 또는 제작자 검색..." oninput="loadPostsDebounced()"></div>
+            <select class="sort-sel" id="sort-sel" onchange="loadPosts(true)">
+              <option value="latest">최신순</option><option value="views">조회수순</option><option value="title">제목순</option>
+            </select>
+          </div>
+        </div>
+        <div class="frow">
+          <button class="fbtn on" onclick="filterG('all',this)">전체</button>
+          <button class="fbtn" onclick="filterG('역학',this)">역학</button>
+          <button class="fbtn" onclick="filterG('전기',this)">전기&#183;자기</button>
+          <button class="fbtn" onclick="filterG('파동',this)">파동&#183;광학</button>
+          <button class="fbtn" onclick="filterG('열역학',this)">열역학</button>
+          <button class="fbtn" onclick="filterG('현대물리',this)">현대물리</button>
+          <button class="fbtn" onclick="filterG('기타',this)">기타</button>
+        </div>
       </div>
-    </div>
-    <div class="subtabs">
-      <button class="nav-tab active" id="subtab-student" onclick="switchSub('student',this)" style="font-size:15px;padding:9px 18px">학생 작품</button>
-      <button class="nav-tab" id="subtab-teacher" onclick="switchSub('teacher',this)" style="font-size:15px;padding:9px 18px">&#128104;&#8205;&#127979; 교사 작품</button>
-    </div>
-    <div class="frow">
-      <button class="fbtn on" onclick="filterG('all',this)">전체</button>
-      <button class="fbtn" onclick="filterG('역학',this)">역학</button>
-      <button class="fbtn" onclick="filterG('전기',this)">전기&#183;자기</button>
-      <button class="fbtn" onclick="filterG('파동',this)">파동&#183;광학</button>
-      <button class="fbtn" onclick="filterG('열역학',this)">열역학</button>
-      <button class="fbtn" onclick="filterG('광학',this)">광학</button>
-      <button class="fbtn" onclick="filterG('기타',this)">기타</button>
+      <div class="ghero-qr" id="gallery-qr-box" title="이 홈페이지 주소 QR — 학생들에게 보여주고 스캔하게 하세요">
+        <div id="gallery-qr-canvas"></div>
+      </div>
     </div>
     <div id="sub-student"><div class="gg" id="gg"></div></div>
   </div>
@@ -1429,7 +1452,31 @@ function sp(id, btn) {
   if (btn && btn.classList) btn.classList.add("active");
 
   if (id === "gallery") {
-    setTimeout(function(){ loadPosts(true); }, 0);
+    setTimeout(function(){ loadPosts(true); renderGalleryQR(); }, 0);
+  }
+}
+
+// 갤러리 상단에 항상 떠 있는 홈페이지 QR (버튼 클릭 없이 바로 보임). 한 번 그리면 재사용.
+var _galleryQRRendered = false;
+function renderGalleryQR() {
+  var box = document.getElementById("gallery-qr-canvas");
+  if (!box || _galleryQRRendered) return;
+  var url = makeBaseUrl();
+  try {
+    if (typeof QRCode !== "undefined") {
+      new QRCode(box, { text: url, width: 140, height: 140, colorDark: "#000", colorLight: "#fff", correctLevel: QRCode.CorrectLevel.M });
+      _galleryQRRendered = true;
+      return;
+    }
+    throw new Error("QRCode library not loaded");
+  } catch (err) {
+    var img = document.createElement("img");
+    img.alt = "홈페이지 QR";
+    img.width = 140; img.height = 140;
+    img.style.cssText = "width:140px;height:140px;background:#fff;border-radius:10px;padding:6px";
+    img.src = "https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=" + encodeURIComponent(url);
+    box.appendChild(img);
+    _galleryQRRendered = true;
   }
 }
 function toggleMob() { document.getElementById("mob-nav").classList.toggle("open"); }
@@ -1746,8 +1793,8 @@ function loadPosts(reset) {
   });
 }
 
-var EMOJI = { "역학": "⚙️", "전기": "⚡", "파동": "🌊", "열역학": "🌡️", "광학": "💡", "기타": "🔬", "교사자료": "👨‍🏫" };
-var TBGC = { "역학": "#07121d", "전기": "#141000", "파동": "#0e0a1c", "열역학": "#160808", "광학": "#061410", "기타": "#0f1117", "교사자료": "#1a1200" };
+var EMOJI = { "역학": "⚙️", "전기": "⚡", "파동": "🌊", "열역학": "🌡️", "현대물리": "💡", "광학": "💡", "기타": "🔬", "교사자료": "👨‍🏫" };
+var TBGC = { "역학": "#07121d", "전기": "#141000", "파동": "#0e0a1c", "열역학": "#160808", "현대물리": "#061410", "광학": "#061410", "기타": "#0f1117", "교사자료": "#1a1200" };
 function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 
 function renderG() {
@@ -2173,7 +2220,7 @@ function openEditForm(pwHash) {
     + '      <select id="edit-tag">'
     + '        <option value="역학">역학</option><option value="전기">전기&#183;자기</option>'
     + '        <option value="파동">파동&#183;광학</option><option value="열역학">열역학</option>'
-    + '        <option value="광학">광학</option><option value="기타">기타</option>'
+    + '        <option value="현대물리">현대물리</option><option value="기타">기타</option>'
     + '      </select>'
     + '    </div>'
     + '    <div class="fg"><label>구분</label>'
