@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
-:root{--bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;--bg4:#0d1117;--accent:#00d4ff;--green:#10b981;--red:#f87171;--amber:#f59e0b;--text:#e8edf5;--text2:#8892a4;--border:rgba(255,255,255,0.07);--borderB:rgba(0,212,255,0.25);--mono:'Space Mono',monospace;--sans:'Noto Sans KR',sans-serif;--r:10px}
+:root{--bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;--bg4:#0d1117;--accent:#00d4ff;--green:#10b981;--red:#f87171;--amber:#f59e0b;--text:#e8edf5;--text2:#8892a4;--codetext:#cdd9e5;--border:rgba(255,255,255,0.07);--borderB:rgba(0,212,255,0.25);--mono:'Space Mono',monospace;--sans:'Noto Sans KR',sans-serif;--r:10px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100vh;overflow:hidden;display:flex;flex-direction:column}
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.025) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;z-index:0}
@@ -48,7 +48,7 @@ header .hright{margin-left:auto}
 .dp{background:#7c3aed;box-shadow:0 0 5px #7c3aed}
 .rw{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:14px 22px 0}
 .rg{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0}
-#code-input{flex:1;width:100%;background:var(--bg4);color:#cdd9e5;border:none;outline:none;font-family:var(--mono);font-size:12.5px;line-height:1.75;padding:14px 16px;resize:none;tab-size:2;min-height:0}
+#code-input{flex:1;width:100%;background:var(--bg4);color:var(--codetext);border:none;outline:none;font-family:var(--mono);font-size:12.5px;line-height:1.75;padding:14px 16px;resize:none;tab-size:2;min-height:0}
 #code-input::placeholder{color:#2a3540;line-height:2.2}
 .ef{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;border-top:1px solid var(--border);background:var(--bg3);flex-shrink:0}
 .hint{font-family:var(--mono);font-size:10px;color:var(--text2);opacity:.4}
@@ -145,7 +145,8 @@ header .hright{margin-left:auto}
 #modal-frame{width:100%;height:100%;border:none;position:absolute;inset:0}
 .mft{padding:11px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;flex-wrap:wrap;gap:8px}
 .mdesc{font-size:12px;color:var(--text2);flex:1;margin-right:10px}
-.mac{display:flex;gap:5px;flex-wrap:wrap}
+.mac{display:flex;gap:5px;flex-wrap:wrap;padding:0 16px 12px;flex-shrink:0}
+.mac:empty{padding:0}
 .mdev{display:flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.025)}
 .mdev-label{font-family:var(--mono);font-size:10px;color:var(--text2);opacity:.55;margin-right:3px}
 .mdev .btn{font-size:10px;padding:4px 8px}
@@ -228,6 +229,7 @@ body.light-mode{
   --card:#ffffff;
   --accent:#0284c7;
   --accent2:#7c3aed;
+  --codetext:#1e293b;
   background:#f4f7fb;
   color:var(--text);
 }
@@ -1352,8 +1354,9 @@ AI에게 이렇게 요청해보세요:
 <div class="mbg" id="mbg" onclick="if(event.target===this)closeM()">
   <div class="modal">
     <div class="mhd"><div><div class="mttl" id="mttl"></div><div class="mmeta" id="mmeta"></div></div><button class="btn bdanger" style="font-size:10px" onclick="closeM()">&#10005;</button></div>
+    <div class="mac" id="mac"></div>
     <div class="mbody"><iframe id="modal-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe><div class="modal-scale-label" id="modal-scale-label"></div></div>
-    <div class="mft"><div style="flex:1;min-width:260px"><div class="mdesc" id="mdesc"></div><details class="report-details" id="report-wrap" style="display:none"><summary>제작 과정 보고서 보기</summary><div class="report-box" id="mreport"></div></details></div><div class="mac" id="mac"></div></div>
+    <div class="mft"><div style="flex:1;min-width:260px"><div class="mdesc" id="mdesc"></div><details class="report-details" id="report-wrap" style="display:none"><summary>제작 과정 보고서 보기</summary><div class="report-box" id="mreport"></div></details></div></div>
   </div>
 </div>
 <div class="qr-bg" id="qr-bg" onclick="if(event.target===this)closeQR()">
@@ -1887,8 +1890,6 @@ function postToG() {
   if (!code) { setSt(st, "코드를 먼저 실행해주세요", "r"); return; }
   if (!title) { setSt(st, "제목을 입력해주세요", "r"); document.getElementById("utitle").focus(); return; }
   if (pw.length < 4) { setSt(st, "비밀번호 4자리 이상", "r"); document.getElementById("upw").focus(); return; }
-  if (!aiLog) { setSt(st, "AI 대화 원문을 입력해주세요", "r"); document.getElementById("uailog").focus(); return; }
-  if (!publicReport) { setSt(st, "공개용 제작 과정 보고서를 입력해주세요", "r"); document.getElementById("upublicreport").focus(); return; }
   if (!checkSensitiveBeforeSubmit(code, aiLog, publicReport)) { setSt(st, "민감정보 의심 항목을 확인해주세요", "r"); return; }
   setSt(st, "업로드 중...", "g");
   document.getElementById("post-btn").disabled = true;
@@ -2151,7 +2152,7 @@ function showAiLogForPost() {
       + '    <button class="btn bdanger" id="ailog-close" style="font-size:10px">✕ 닫기</button>'
       + '  </div>'
       + '  <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2)">' + esc(data.title || openP.title || "") + '</div>'
-      + '  <textarea id="ailog-text" readonly style="flex:1;width:100%;background:var(--bg4);color:#cdd9e5;border:none;outline:none;font-family:var(--sans);font-size:12px;line-height:1.65;padding:14px 16px;resize:none;white-space:pre-wrap"></textarea>'
+      + '  <textarea id="ailog-text" readonly style="flex:1;width:100%;background:var(--bg4);color:var(--codetext);border:none;outline:none;font-family:var(--sans);font-size:12px;line-height:1.65;padding:14px 16px;resize:none;white-space:pre-wrap"></textarea>'
       + '  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 16px;border-top:1px solid var(--border);background:var(--bg3)">'
       + '    <span style="font-size:11px;color:var(--text2);font-family:var(--mono)">prompt log</span>'
       + '    <button class="btn" id="ailog-copy">복사</button>'
@@ -2231,7 +2232,7 @@ function openEditForm(pwHash) {
     + '    </div>'
     + '    <div class="fg" style="grid-column:1/-1"><label>공개용 제작 과정 보고서</label><textarea id="edit-public-report" style="min-height:90px"></textarea></div>'
     + '  </div>'
-    + '  <textarea id="edit-code" spellcheck="false" style="flex:1;width:100%;background:var(--bg4);color:#cdd9e5;border:none;outline:none;font-family:var(--mono);font-size:12.5px;line-height:1.7;padding:14px 16px;resize:none;tab-size:2"></textarea>'
+    + '  <textarea id="edit-code" spellcheck="false" style="flex:1;width:100%;background:var(--bg4);color:var(--codetext);border:none;outline:none;font-family:var(--mono);font-size:12.5px;line-height:1.7;padding:14px 16px;resize:none;tab-size:2"></textarea>'
     + '  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 16px;border-top:1px solid var(--border);background:var(--bg3)">'
     + '    <span id="edit-status" style="font-size:11px;font-family:var(--mono);color:var(--text2)"></span>'
     + '    <div style="display:flex;gap:7px"><button class="btn" id="edit-preview">미리보기 확인</button><button class="btn bup" id="edit-save">저장하기</button></div>'
@@ -2280,7 +2281,6 @@ function saveEditForm(pwHash) {
   var st = document.getElementById("edit-status");
   if (!title) { st.style.color = "var(--red)"; st.textContent = "제목을 입력해주세요."; return; }
   if (!code.trim()) { st.style.color = "var(--red)"; st.textContent = "코드를 입력해주세요."; return; }
-  if (!publicReport) { st.style.color = "var(--red)"; st.textContent = "공개용 제작 과정 보고서를 입력해주세요."; return; }
   if (!checkSensitiveBeforeSubmit(code, "", publicReport)) { st.style.color = "var(--red)"; st.textContent = "민감정보 의심 항목을 확인해주세요."; return; }
   st.style.color = "var(--green)";
   st.textContent = "저장 중...";
