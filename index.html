@@ -1600,6 +1600,163 @@ AI에게 이렇게 요청해보세요:
 
 </script>
 <script>
+/* Camera frames cross the existing opaque sandbox over a dedicated channel.
+   No same-origin access, credentials or MediaStream objects cross the boundary. */
+(function () {
+  'use strict';
+  const ids = ['preview-frame', 'modal-frame', 'fs-frame', 'kiosk-frame'];
+  let active = null, prompt = null, bar = null;
+  function childCameraBridge() {
+    let current = null;
+    const fail = message => new DOMException(message, 'NotAllowedError');
+    window.rpCameraBridge = {
+      version: 1,
+      start(options = {}) {
+        if (current) return Promise.reject(fail('이 실험의 카메라를 먼저 꺼주세요.'));
+        const channel = new MessageChannel();
+        const port = channel.port1;
+        let closed = false, settled = false, resolveStart, rejectStart, imageURL;
+        let session;
+        function stop(message, notify = true) {
+          if (closed) return;
+          closed = true; clearInterval(heartbeat); clearTimeout(timeout);
+          if (imageURL) URL.revokeObjectURL(imageURL);
+          if (notify) { try { port.postMessage({type:'stop'}); } catch (_) {} }
+          port.close(); current = null;
+          if (!settled) { settled = true; rejectStart(fail(message || '카메라 요청이 취소되었습니다.')); }
+          try { if (options.onStop) options.onStop(message || '카메라가 꺼졌습니다.'); } catch (_) {}
+        }
+        const result = new Promise((resolve, reject) => { resolveStart = resolve; rejectStart = reject; });
+        const heartbeat = setInterval(() => { if (!closed) port.postMessage({type:'alive'}); }, 1500);
+        const timeout = setTimeout(() => stop('카메라 연결 시간이 초과되었습니다. 다시 요청해주세요.'), 120000);
+        session = { stop: () => stop('카메라를 껐습니다.'), facingMode: options.facingMode === 'user' ? 'user' : 'environment' };
+        current = session;
+        port.onmessage = async event => {
+          const data = event.data || {};
+          if (closed) return;
+          if (data.type === 'stopped' || data.type === 'error') { stop(data.message, false); return; }
+          if (data.type === 'started') { session.facingMode = data.facingMode; return; }
+          if (data.type !== 'frame' || !(data.bytes instanceof ArrayBuffer)) return;
+          try {
+            const img = new Image();
+            imageURL = URL.createObjectURL(new Blob([data.bytes], {type:'image/jpeg'}));
+            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = imageURL; });
+            if (closed) return;
+            if (options.onFrame) await options.onFrame(img);
+            if (!settled) { settled = true; clearTimeout(timeout); resolveStart(session); }
+            port.postMessage({type:'ready'});
+          } catch (_) { stop('카메라 영상을 읽을 수 없습니다. 다시 요청해주세요.'); }
+          finally { if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; } }
+        };
+        window.parent.postMessage({type:'real-physics-camera-v1', facingMode:session.facingMode}, '*', [channel.port2]);
+        return result;
+      },
+      stop() { if (current) current.stop(); }
+    };
+    window.addEventListener('pagehide', () => window.rpCameraBridge.stop());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) window.rpCameraBridge.stop(); });
+  }
+  const visible = frame => !!(frame && frame.isConnected && frame.getClientRects().length && getComputedStyle(frame).visibility !== 'hidden');
+  function send(s, data) { try { s.port.postMessage(data); } catch (_) {} }
+  function stop(s, message = '카메라를 껐습니다.') {
+    if (!s || s.closed) return;
+    s.closed = true; clearInterval(s.timer);
+    if (s.stream) s.stream.getTracks().forEach(t => t.stop());
+    if (s.video) { s.video.pause(); s.video.srcObject = null; s.video.remove(); }
+    send(s, {type:'stopped', message}); s.port.close();
+    if (active === s) { active = null; if (prompt && prompt.open) prompt.close(); if (bar) bar.hidden = true; }
+  }
+  function ensureUI() {
+    if (prompt) return;
+    const style = document.createElement('style');
+    style.textContent = '#rp-camera-prompt{margin:auto;width:min(460px,calc(100vw - 32px));padding:24px;border:1px solid #b4c9dd;border-radius:14px;background:white;color:#1b2e44;font:16px/1.7 system-ui}#rp-camera-prompt::backdrop{background:#10213399}#rp-camera-prompt h2{font-size:20px;margin:0 0 12px}#rp-camera-prompt p{margin:12px 0}#rp-camera-prompt button,#rp-camera-bar button{padding:12px;border:1px solid #a9bdd0;border-radius:8px;background:white;color:#183751;cursor:pointer;font:600 14px system-ui}#rp-camera-allow{background:#1767df!important;color:white!important}#rp-camera-bar{position:fixed;top:12px;right:12px;z-index:2147483647;max-width:calc(100vw - 24px);display:flex;gap:12px;align-items:center;padding:10px;background:white;color:#912b39;border:2px solid #c9495c;border-radius:12px;font:600 14px system-ui}#rp-camera-bar[hidden]{display:none}';
+    document.head.appendChild(style);
+    prompt = document.createElement('dialog'); prompt.id = 'rp-camera-prompt';
+    prompt.setAttribute('aria-labelledby','rp-camera-title');
+    prompt.innerHTML = '<h2 id="rp-camera-title">이 실험에서 카메라를 사용할까요?</h2><p id="rp-camera-context"></p><p>선택한 실험 코드에 실시간 카메라 영상을 전달합니다. 신뢰하는 실험에서만 허용해주세요. 연결 기능 자체는 영상을 서버에 저장하지 않지만, 실험 코드는 영상을 처리하거나 외부로 보낼 수 있습니다.</p><p>브라우저가 카메라 권한을 물으면 직접 허용해주세요. 마이크는 켜지지 않습니다.</p><p id="rp-camera-feedback" role="status"></p><div style="display:flex;gap:12px;justify-content:flex-end"><button id="rp-camera-deny" autofocus>취소</button><button id="rp-camera-allow">동의하고 카메라 켜기</button></div>';
+    document.body.appendChild(prompt);
+    bar = document.createElement('div'); bar.id = 'rp-camera-bar'; bar.hidden = true;
+    bar.innerHTML = '<span role="status">실험에 카메라 영상 전달 중</span><button type="button">카메라 끄기</button>';
+    document.body.appendChild(bar); bar.querySelector('button').onclick = () => stop(active);
+    document.getElementById('rp-camera-deny').onclick = () => { stop(active, '카메라 요청을 취소했습니다.'); prompt.close(); };
+    prompt.addEventListener('cancel', event => { event.preventDefault(); stop(active, '카메라 요청을 취소했습니다.'); prompt.close(); });
+    document.getElementById('rp-camera-allow').onclick = async function () {
+      const s = active; if (!s || s.closed || s.starting) return;
+      s.starting = true; this.disabled = true;
+      document.getElementById('rp-camera-feedback').textContent = '카메라 권한을 확인하고 있습니다…';
+      try {
+        if (!isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('카메라는 HTTPS 웹사이트에서 사용할 수 있습니다.');
+        const stream = await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:s.facingMode},width:{ideal:960},height:{ideal:720},frameRate:{ideal:24,max:30}}});
+        if (s.closed || active !== s || !visible(s.frame) || document.hidden) { stream.getTracks().forEach(t => t.stop()); stop(s); return; }
+        s.stream = stream; s.video = document.createElement('video');
+        s.video.muted = true; s.video.autoplay = true; s.video.playsInline = true;
+        s.video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none';
+        document.body.appendChild(s.video); s.video.srcObject = stream; await s.video.play();
+        if (s.closed) return;
+        s.canvas = document.createElement('canvas'); s.context = s.canvas.getContext('2d');
+        const track = stream.getVideoTracks()[0];
+        s.facingMode = track.getSettings().facingMode || s.facingMode;
+        track.addEventListener('ended', () => stop(s,'카메라 연결이 종료되었습니다.'));
+        send(s,{type:'started',facingMode:s.facingMode});
+        s.ready = true; s.lastAck = Date.now(); prompt.close(); bar.hidden = false;
+        s.timer = setInterval(async () => {
+          if (s.closed || !s.ready || s.encoding || s.video.readyState < 2) return;
+          s.encoding = true; s.ready = false; s.lastAck = Date.now();
+          try {
+            const scale = Math.min(1,960 / Math.max(s.video.videoWidth,s.video.videoHeight));
+            const w = Math.max(1,Math.round(s.video.videoWidth*scale)), h = Math.max(1,Math.round(s.video.videoHeight*scale));
+            if (s.canvas.width !== w || s.canvas.height !== h) { s.canvas.width=w; s.canvas.height=h; }
+            s.context.drawImage(s.video,0,0,w,h);
+            const blob = await new Promise(resolve => s.canvas.toBlob(resolve,'image/jpeg',.85));
+            if (!blob) throw new Error('빈 영상');
+            const bytes = await blob.arrayBuffer();
+            if (!s.closed) s.port.postMessage({type:'frame',bytes},[bytes]);
+          } catch (_) { stop(s,'카메라 영상 전달에 실패했습니다. 다시 켜주세요.'); }
+          finally { s.encoding=false; }
+        }, 50);
+      } catch (error) {
+        const message = error.name === 'NotAllowedError' ? '카메라가 허용되지 않았습니다. 사이트 권한을 확인한 뒤 다시 요청해주세요.' : error.name === 'NotFoundError' ? '사용할 수 있는 카메라가 없습니다.' : error.message || '카메라를 열 수 없습니다.';
+        stop(s,message);
+        document.getElementById('rp-camera-feedback').textContent = message;
+        if (!prompt.open) prompt.showModal();
+      }
+    };
+  }
+  window.addEventListener('message', event => {
+    if (event.data?.type !== 'real-physics-camera-v1' || event.ports.length !== 1) return;
+    const frame = ids.map(id => document.getElementById(id)).find(f => f && f.contentWindow === event.source);
+    const port = event.ports[0];
+    if (!visible(frame) || document.hidden) { port.close(); return; }
+    if (active) { try { port.postMessage({type:'error',message:'다른 카메라 요청이나 사용을 먼저 종료해주세요.'}); } finally { port.close(); } return; }
+    const s = {frame,port,closed:false,starting:false,lastAlive:Date.now(),requested:Date.now(),facingMode:event.data.facingMode === 'user' ? 'user' : 'environment'};
+    active=s; ensureUI();
+    port.onmessage = event => {
+      if (event.data?.type === 'stop') stop(s);
+      if (event.data?.type === 'alive') s.lastAlive=Date.now();
+      if (event.data?.type === 'ready') { s.ready=true; s.lastAck=Date.now(); }
+    };
+    document.getElementById('rp-camera-context').textContent = frame.id === 'modal-frame' ? (document.getElementById('mttl')?.textContent || '현재 실험') : '현재 실행 중인 실험';
+    document.getElementById('rp-camera-feedback').textContent='';
+    document.getElementById('rp-camera-allow').disabled=false; prompt.showModal();
+  });
+  setInterval(() => {
+    const s=active; if (!s) return;
+    if (!visible(s.frame) || Date.now()-s.lastAlive>15000 || (!s.stream && Date.now()-s.requested>120000) || (s.stream && Date.now()-s.lastAck>15000)) stop(s,'실험 연결이 종료되어 카메라를 껐습니다.');
+  },500);
+  window.addEventListener('pagehide',()=>stop(active));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop(active);});
+  const previousStop=window.rpStopExperimentMicrophone;
+  window.rpStopExperimentMicrophone=function(frame){previousStop(frame);if(active&&(!frame||active.frame===frame))stop(active);};
+  const previousInject=window.rpAddMicrophoneBridge;
+  window.rpAddMicrophoneBridge=function(html){
+    const script='<script>('+childCameraBridge.toString()+')();<\/script>';
+    const withCamera=/<head\b[^>]*>/i.test(html)?html.replace(/<head\b[^>]*>/i,head=>head+script):script+html;
+    return previousInject(withCamera);
+  };
+})();
+
+</script>
+<script>
 var APPS_URL = "https://script.google.com/macros/s/AKfycbwqgfUxhRUdo9VUCyH1JIHafv24zQtgVxe_vTEbuJqSjkm_zG_JFJCkUa8SaZwPjb1siQ/exec";
 var PUBLIC_PROMPT = "아래에 내가 생성형 AI와 실제로 나눈 대화 내용을 붙여넣을 거야.\n이 대화 내용을 바탕으로, 내가 만든 앱의 제작 과정과 개선 과정을 공개용 제작 과정 보고서 형태로 정리해줘.\n\n다음 조건을 반드시 지켜줘.\n\n1. 아래에 붙여넣은 실제 대화 내용에 나온 정보만 바탕으로 작성해줘.\n2. 실제 대화에 없는 기능, 의도, 오류 해결 과정, 배운 점은 새로 지어내지 마.\n3. 내가 처음 만들고자 한 앱의 목적을 대화 내용에 근거해서 설명해줘.\n4. 앱 제작을 위해 처음 입력한 요청 내용을 요약해줘.\n5. 이후 내가 어떤 기능을 추가하거나 수정했는지 시간 순서대로 정리해줘.\n6. 실행 과정에서 오류, 불편한 점, 부족한 점이 실제 대화에 나타난 경우에만 그것을 어떻게 발견했고 어떻게 수정 요청했는지 정리해줘.\n7. 오류나 불편한 점이 대화에 명확히 나타나지 않는다면, “대화 원문에서 구체적인 오류나 불편 사항은 확인되지 않음”이라고 써줘.\n8. 최종 앱의 기능과 특징을 정리하되, 실제 대화에서 확인되는 기능만 포함해줘.\n9. 내가 단순히 코드를 받은 것이 아니라, 추가 요청이나 수정 요청을 통해 앱을 개선한 과정이 실제 대화에 드러나는 경우에만 그 점을 설명해줘.\n10. 코드 전문은 출력하지 말고, 제작 과정과 개선 과정만 정리해줘.\n11. 개인정보, 계정 정보, 비밀번호, API 키, 인증 토큰, 이메일 주소, 전화번호, 학교 계정, 웹앱 배포 주소 중 민감해 보이는 정보는 절대 포함하지 마.\n12. 만약 대화 내용 안에 개인정보나 민감정보로 보이는 내용이 있다면, 보고서에 쓰지 말고 “[개인정보 보호를 위해 생략함]”이라고 처리해줘.\n13. 특정 개인을 식별할 수 있는 이름, 학번, 반, 번호가 있다면 일반적인 표현으로 바꿔줘. 예를 들어 “홍길동” 대신 “작성자”, “우리 반 3번 학생” 대신 “사용자”라고 표현해줘.\n14. 문장은 학생이 제출하는 보고서처럼 자연스럽게 작성해줘.\n15. 너무 과장된 표현은 피하고, 실제 제작 과정이 드러나도록 구체적으로 작성해줘.\n16. “배운 점”은 추측해서 쓰지 마. 학생이 실제로 말했거나, 대화에서 명확히 확인되는 제작 태도와 개선 과정만 바탕으로 작성해줘.\n17. 학생이 무엇을 배웠는지 원문만으로 명확히 알 수 없다면, “대화 원문만으로는 학생이 실제로 무엇을 배웠는지 명확히 확인하기 어렵다”라고 써줘.\n18. 평가나 연구에 활용될 수 있는 자료이므로, 실제 원문보다 학생의 역량이 과장되어 보이도록 쓰지 마.\n\n아래 형식으로 작성해줘.\n\n1. 앱 제작 주제\n2. 앱 제작 목적\n3. 처음 입력한 프롬프트 요약\n4. 제작 과정에서 추가하거나 수정한 내용\n5. 오류 또는 문제 해결 과정\n6. 최종 앱의 주요 기능\n7. 원문에서 확인되는 제작 과정의 특징\n8. 원문만으로 확인하기 어려운 점\n9. 최종 제출용 요약문\n\n특히 9번 “최종 제출용 요약문”은 5~8문장 정도의 자연스러운 문단으로 작성해줘.\n단, 요약문 안에서도 원문에 없는 배운 점이나 성찰을 새로 만들어내지 마.\n\n이제 아래에 실제 대화 내용을 붙여넣을게.\n\n[여기에 생성형 AI와 나눈 실제 대화 내용을 붙여넣기]";
 
@@ -2874,7 +3031,7 @@ function initPreviewResizer() {
 (function showBuildMarker(){
   function ready(){
     var el = document.createElement("div");
-    el.textContent = "build 2026-06-08-device-text-v12 · MIC-02";
+    el.textContent = "build 2026-06-08-device-text-v12 · MIC-02 · CAM-01";
     el.style.cssText = "position:fixed;left:8px;bottom:6px;z-index:99999;font:10px monospace;color:rgba(136,146,164,.5);pointer-events:none";
     document.body.appendChild(el);
   }
