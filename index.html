@@ -1247,7 +1247,7 @@ AI에게 이렇게 요청해보세요:
         </div>
         <div class="pv-inner">
           <div class="pv-ph" id="pvph"><div class="ei">&#9883;</div><p>코드를 입력하고<br>[&#9654; 실행]을 눌러주세요</p></div>
-          <iframe id="preview-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe>
+          <iframe id="preview-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads" allow="camera"></iframe>
         </div>
         <div class="pv-resize-handle" id="pv-resize-handle">↕ 실행 화면 높이 조절</div>
         <div class="pv-foot"><span style="font-family:var(--mono);font-size:10px;color:var(--text2);opacity:.3">sandbox &#183; 안전 실행 환경</span></div>
@@ -1349,13 +1349,13 @@ AI에게 이렇게 요청해보세요:
 
 <div class="fsov" id="fsov">
   <div class="fsbar"><span>Real Physics &#8212; 전체화면</span><button class="btn" onclick="closeFs()">&#10005; 닫기 (ESC)</button></div>
-  <iframe id="fs-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe>
+  <iframe id="fs-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads" allow="camera"></iframe>
 </div>
 <div class="mbg" id="mbg" onclick="if(event.target===this)closeM()">
   <div class="modal">
     <div class="mhd"><div><div class="mttl" id="mttl"></div><div class="mmeta" id="mmeta"></div></div><button class="btn bdanger" style="font-size:10px" onclick="closeM()">&#10005;</button></div>
     <div class="mac" id="mac"></div>
-    <div class="mbody"><iframe id="modal-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads"></iframe><div class="modal-scale-label" id="modal-scale-label"></div></div>
+    <div class="mbody"><iframe id="modal-frame" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads" allow="camera"></iframe><div class="modal-scale-label" id="modal-scale-label"></div></div>
     <div class="mft"><div style="flex:1;min-width:260px"><div class="mdesc" id="mdesc"></div><details class="report-details" id="report-wrap" style="display:none"><summary>제작 과정 보고서 보기</summary><div class="report-box" id="mreport"></div></details></div></div>
   </div>
 </div>
@@ -2579,6 +2579,7 @@ function adminDelete() {
       var frame = document.createElement("iframe");
       frame.id = "kiosk-frame";
       frame.setAttribute("sandbox", "allow-scripts allow-modals allow-forms allow-popups allow-downloads");
+      frame.setAttribute("allow", "camera");
       document.body.appendChild(frame);
 
       var titleBar = document.createElement("div");
