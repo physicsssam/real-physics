@@ -1376,214 +1376,6 @@ AI에게 이렇게 요청해보세요:
   </div>
 </div>
 <script>
-/* Real Physics CAM-01: camera stays in the trusted parent; video is sent over
-   an in-page WebRTC connection. No STUN/TURN servers or same-origin sandbox. */
-(function () {
-  'use strict';
-  const TYPE = 'real-physics-camera-v1';
-  const ids = ['preview-frame', 'modal-frame', 'fs-frame', 'kiosk-frame'];
-  let session = null;
-  const visible = f => f && f.isConnected && f.getClientRects().length > 0 && !document.hidden;
-  const errorText = e => (e.name || 'Error') + ': ' + (e.message || '카메라 연결 실패');
-  function send(s, data) { if (!s.closed) s.port.postMessage(data); }
-  function stop(s, message) {
-    if (!s || s.closed) return;
-    send(s, {type:'closed', message:message || '카메라 연결을 종료했습니다.'});
-    s.closed = true;
-    clearTimeout(s.timeout);
-    if (s.stream) s.stream.getTracks().forEach(t => t.stop());
-    if (s.pc) s.pc.close();
-    if (s.ui) s.ui.remove();
-    s.port.close();
-    if (session === s) session = null;
-  }
-  function videoConstraints(input) {
-    if (input === true) return true;
-    if (!input || typeof input !== 'object') throw new Error('영상 요청이 필요합니다.');
-    const out = {};
-    ['facingMode','deviceId','width','height','frameRate','aspectRatio'].forEach(k => {
-      if (Object.prototype.hasOwnProperty.call(input, k)) out[k] = input[k];
-    });
-    return out;
-  }
-  function showConsent(s) {
-    const box = document.createElement('dialog');
-    s.ui = box;
-    box.style.cssText = 'margin:auto;padding:24px;max-width:420px;width:calc(100% - 32px);border:2px solid #00a0c0;border-radius:14px;background:#fff;color:#172838;font:16px/1.6 system-ui;z-index:2147483647';
-    const title = document.createElement('h2'); title.textContent = '이 실험에서 카메라를 사용할까요?';
-    const detail = document.createElement('p');
-    detail.textContent = '카메라 영상과 지원되는 플래시 제어를 현재 실험에 제공합니다. 허용 후 브라우저의 카메라 권한도 허용해 주세요.';
-    const status = document.createElement('p'); status.setAttribute('role','status');
-    const no = document.createElement('button'); no.textContent = '취소';
-    const yes = document.createElement('button'); yes.textContent = '동의하고 카메라 연결';
-    [no, yes].forEach(b => { b.type='button'; b.style.cssText='padding:12px;margin:8px 8px 0 0;cursor:pointer'; });
-    box.append(title,detail,status,no,yes); document.body.appendChild(box);
-    no.onclick = () => stop(s, '사용자가 카메라 연결을 취소했습니다.');
-    box.addEventListener('cancel', e => { e.preventDefault(); no.click(); });
-    yes.onclick = async () => {
-      if (s.starting || s.closed) return;
-      s.starting = true; yes.disabled = true;
-      try {
-        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('카메라를 사용하려면 갤러리를 HTTPS 주소로 여세요.');
-        if (!window.RTCPeerConnection) throw new Error('이 브라우저는 카메라 연결을 지원하지 않습니다.');
-        status.textContent = '카메라 권한을 확인하고 있습니다…';
-        const stream = await navigator.mediaDevices.getUserMedia({video:s.video, audio:false});
-        if (s.closed || !visible(s.frame)) { stream.getTracks().forEach(t => t.stop()); stop(s); return; }
-        s.stream = stream; s.track = stream.getVideoTracks()[0];
-        s.track.addEventListener('ended', () => stop(s));
-        s.pc = new RTCPeerConnection({iceServers:[]});
-        s.pc.onicecandidate = e => { if (e.candidate) send(s,{type:'ice',candidate:e.candidate.toJSON()}); };
-        s.pc.onconnectionstatechange = () => { if (s.pc.connectionState === 'failed') stop(s,'영상 연결에 실패했습니다.'); };
-        s.pc.addTrack(s.track, stream);
-        await s.pc.setLocalDescription(await s.pc.createOffer());
-        if (s.closed) return;
-        send(s,{type:'offer', description:s.pc.localDescription.toJSON(), capabilities:s.track.getCapabilities?.() || {}, settings:s.track.getSettings(), constraints:s.track.getConstraints()});
-        box.close(); box.remove();
-        const bar = document.createElement('div'); s.ui = bar;
-        bar.style.cssText='position:fixed;bottom:12px;right:12px;z-index:2147483647;background:white;color:#172838;padding:12px;border:2px solid #c44;border-radius:10px;font:14px system-ui';
-        const label = document.createElement('span'); label.textContent='● 실험에 카메라 연결 중 ';
-        const end = document.createElement('button'); end.textContent='카메라·플래시 끄기'; end.onclick=()=>stop(s);
-        bar.append(label,end); document.body.appendChild(bar);
-        s.timeout=setTimeout(()=>stop(s,'영상 연결 시간이 초과되었습니다. 다시 준비해 주세요.'),30000);
-      } catch(e) {
-        if (s.closed) return;
-        send(s,{type:'error',name:e.name,message:e.message});
-        stop(s);
-        // Keep the actual error visible even when the experiment uses a generic catch.
-        const notice=document.createElement('dialog');
-        notice.style.cssText=box.style.cssText;
-        const p=document.createElement('p'); p.textContent=errorText(e);
-        const close=document.createElement('button'); close.textContent='닫기'; close.onclick=()=>notice.remove();
-        notice.append(p,close); document.body.appendChild(notice); notice.showModal();
-      }
-    };
-    box.showModal();
-  }
-  window.addEventListener('message', event => {
-    if (event.data?.type !== TYPE || event.ports.length !== 1) return;
-    const port=event.ports[0];
-    const frame=ids.map(id=>document.getElementById(id)).find(f=>f && f.contentWindow===event.source);
-    if (!visible(frame)) { port.close(); return; }
-    if (session) { port.postMessage({type:'error',name:'InvalidStateError',message:'기존 카메라 연결을 먼저 종료하세요.'}); port.close(); return; }
-    let video;
-    try {
-      if (JSON.stringify(event.data.video).length > 4096) throw new Error('요청이 너무 큽니다.');
-      video=videoConstraints(event.data.video);
-    } catch(e) { port.postMessage({type:'error',name:'TypeError',message:e.message}); port.close(); return; }
-    const s={frame,port,video,closed:false,alive:Date.now(),queue:Promise.resolve(),requests:0,ice:[]}; session=s;
-    port.onmessage=async event => {
-      if(s.closed) return;
-      const d=event.data || {};
-      try {
-        if(d.type==='stop') { stop(s); return; }
-        if(d.type==='alive') s.alive=Date.now();
-        if(d.type==='ready') { clearTimeout(s.timeout); s.ready=true; }
-        if(d.type==='answer' && s.pc && !s.pc.remoteDescription) {
-          await s.pc.setRemoteDescription(d.description);
-          for(const candidate of s.ice.splice(0)) await s.pc.addIceCandidate(candidate);
-        }
-        if(d.type==='ice') {
-          if(s.pc?.remoteDescription) await s.pc.addIceCandidate(d.candidate);
-          else if(s.ice.length<64) s.ice.push(d.candidate);
-        }
-        if(d.type==='constraints' && s.track) {
-          if(s.requests>=4) { send(s,{type:'result',id:d.id,error:'플래시 요청이 너무 많습니다.'}); return; }
-          // Only the physical torch control is proxied. Other constraints are rejected.
-          const c=d.value;
-          if(!c || Object.keys(c).length!==1 || !Array.isArray(c.advanced) || c.advanced.length!==1 || Object.keys(c.advanced[0]).length!==1 || typeof c.advanced[0].torch!=='boolean') {
-            send(s,{type:'result',id:d.id,error:'이 연결은 applyConstraints의 torch 제어만 지원합니다.'}); return;
-          }
-          s.requests++;
-          s.queue=s.queue.then(async()=>{
-            if(s.closed) return;
-            try { await s.track.applyConstraints({advanced:[{torch:c.advanced[0].torch}]}); send(s,{type:'result',id:d.id,settings:s.track.getSettings(),constraints:s.track.getConstraints()}); }
-            catch(e) { send(s,{type:'result',id:d.id,error:errorText(e)}); }
-          }).finally(()=>{s.requests--;});
-        }
-      } catch(e) { send(s,{type:'error',name:e.name,message:e.message}); stop(s); }
-    };
-    showConsent(s);
-  });
-  setInterval(()=>{ if(session && (!visible(session.frame) || Date.now()-session.alive>15000)) stop(session); },500);
-  window.addEventListener('pagehide',()=>stop(session));
-  document.addEventListener('visibilitychange',()=>{if(document.hidden) stop(session);});
-  window.rpStopExperimentCamera = frame => {if(session && (!frame || frame===session.frame)) stop(session);};
-  window.rpCameraChild = function () {
-    'use strict';
-    const devices=navigator.mediaDevices;
-    const audio=devices.getUserMedia.bind(devices);
-    let current=null;
-    function camera(c) {
-      if(!c?.video) return audio(c);
-      if(c.audio) return Promise.reject(new DOMException('카메라와 마이크 동시 요청은 이 연결에서 지원하지 않습니다.','NotSupportedError'));
-      if(current) return Promise.reject(new DOMException('기존 카메라 연결을 먼저 종료하세요.','InvalidStateError'));
-      if(!window.RTCPeerConnection) return Promise.reject(new DOMException('영상 연결을 지원하지 않는 브라우저입니다.','NotSupportedError'));
-      return new Promise((resolve,reject)=>{
-        const channel=new MessageChannel(), port=channel.port1;
-        const pc=new RTCPeerConnection({iceServers:[]});
-        let closed=false, settled=false, stream=null, caps={}, settings={}, constraints={}, seq=0;
-        const requests=new Map(), ice=[];
-        const send=d=>{if(!closed) port.postMessage(d);};
-        const fail=(message,name)=>new DOMException(message || '카메라 연결이 종료되었습니다.',name || 'NotAllowedError');
-        function cleanup(notify,error) {
-          if(closed)return;
-          if(notify)send({type:'stop'});
-          closed=true; current=null; clearInterval(heartbeat); pc.close();
-          if(stream)stream.getTracks().forEach(t=>{MediaStreamTrack.prototype.stop.call(t);t.dispatchEvent(new Event('ended'));});
-          requests.forEach(r=>{clearTimeout(r.timer);r.reject(error || fail());});requests.clear();port.close();
-          if(!settled){settled=true;reject(error || fail());}
-        }
-        current=()=>cleanup(true);
-        const heartbeat=setInterval(()=>send({type:'alive'}),1500);
-        pc.onicecandidate=e=>{if(e.candidate)send({type:'ice',candidate:e.candidate.toJSON()});};
-        pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')cleanup(true,fail('영상 연결에 실패했습니다.'));};
-        pc.ontrack=event=>{
-          stream=event.streams[0] || new MediaStream([event.track]);
-          const track=event.track;
-          track.getCapabilities=()=>structuredClone(caps);
-          track.getSettings=()=>structuredClone(settings);
-          track.getConstraints=()=>structuredClone(constraints);
-          track.applyConstraints=value=>new Promise((resolve,reject)=>{
-            if(closed){reject(fail());return;}
-            const id=++seq;
-            const timer=setTimeout(()=>{requests.delete(id);reject(fail('플래시 응답 시간이 초과되었습니다.','TimeoutError'));},10000);
-            requests.set(id,{resolve,reject,timer});send({type:'constraints',id,value});
-          });
-          track.stop=()=>cleanup(true);
-          track.addEventListener('ended',()=>cleanup(true));
-          if(!settled){settled=true;send({type:'ready'});resolve(stream);}
-        };
-        port.onmessage=async event=>{
-          if(closed)return;
-          const d=event.data || {};
-          try {
-            if(d.type==='error' || d.type==='closed'){cleanup(false,fail(d.message,d.name));return;}
-            if(d.type==='offer') {
-              caps=d.capabilities;settings=d.settings;constraints=d.constraints;
-              await pc.setRemoteDescription(d.description);
-              for(const candidate of ice.splice(0))await pc.addIceCandidate(candidate);
-              await pc.setLocalDescription(await pc.createAnswer());
-              send({type:'answer',description:pc.localDescription.toJSON()});
-            }
-            if(d.type==='ice') {if(pc.remoteDescription)await pc.addIceCandidate(d.candidate);else ice.push(d.candidate);}
-            if(d.type==='result') {
-              const r=requests.get(d.id);if(!r)return;
-              clearTimeout(r.timer);requests.delete(d.id);
-              if(d.error)r.reject(fail(d.error,'NotSupportedError'));
-              else{settings=d.settings;constraints=d.constraints;r.resolve();}
-            }
-          }catch(e){cleanup(true,e);}
-        };
-        window.parent.postMessage({type:'real-physics-camera-v1',video:c.video},'*',[channel.port2]);
-      });
-    }
-    Object.defineProperty(devices,'getUserMedia',{value:camera,configurable:true});
-    window.addEventListener('pagehide',()=>{if(current)current();});
-  };
-})();
-
-</script>
-<script>
 /* Real Physics: user-approved, audio-only bridge for opaque sandbox frames.
    No allow-same-origin, admin state, storage, or camera access is exposed. */
 (function () {
@@ -1796,14 +1588,298 @@ AI에게 이렇게 요청해보세요:
   window.addEventListener('pagehide', function () { stop(active); stop(pending); });
   document.addEventListener('visibilitychange', function () { if (document.hidden) { stop(active); } });
   window.rpStopExperimentMicrophone = function (frame) {
-    window.rpStopExperimentCamera(frame);
     [active, pending].forEach(function (session) { if (session && (!frame || session.frame === frame)) stop(session); });
   };
   window.rpAddMicrophoneBridge = function (html) {
-    var script = '<script>(' + childBridge.toString() + ')();(' + window.rpCameraChild.toString() + ')();<\/script>';
+    var script = '<script>(' + childBridge.toString() + ')();<\/script>';
     if (/<head\b[^>]*>/i.test(html)) return html.replace(/<head\b[^>]*>/i, function (head) { return head + script; });
     if (/<html\b[^>]*>/i.test(html)) return html.replace(/<html\b[^>]*>/i, function (root) { return root + '<head>' + script + '</head>'; });
     return script + html;
+  };
+})();
+
+</script>
+<script>
+/* Camera frames cross the existing opaque sandbox over a dedicated channel.
+   No same-origin access, credentials or MediaStream objects cross the boundary. */
+(function () {
+  'use strict';
+  const ids = ['preview-frame', 'modal-frame', 'fs-frame', 'kiosk-frame'];
+  let active = null, prompt = null, bar = null;
+  function childCameraBridge() {
+    let current = null;
+    const fail = message => new DOMException(message, 'NotAllowedError');
+    window.rpCameraBridge = {
+      version: 2,
+      start(options = {}) {
+        if (current) return Promise.reject(fail('이 실험의 카메라를 먼저 꺼주세요.'));
+        const channel = new MessageChannel();
+        const port = channel.port1;
+        const wantFrames = options.frames !== false;
+        let closed = false, settled = false, resolveStart, rejectStart, imageURL;
+        let session, torchSeq = 0;
+        const torchWaits = new Map();
+        function stop(message, notify = true) {
+          if (closed) return;
+          closed = true; clearInterval(heartbeat); clearTimeout(timeout);
+          if (imageURL) URL.revokeObjectURL(imageURL);
+          if (notify) { try { port.postMessage({type:'stop'}); } catch (_) {} }
+          port.close(); current = null;
+          torchWaits.forEach(w => w.reject(fail(message || '카메라가 꺼졌습니다.'))); torchWaits.clear();
+          if (!settled) { settled = true; rejectStart(fail(message || '카메라 요청이 취소되었습니다.')); }
+          try { if (options.onStop) options.onStop(message || '카메라가 꺼졌습니다.'); } catch (_) {}
+        }
+        const result = new Promise((resolve, reject) => { resolveStart = resolve; rejectStart = reject; });
+        const heartbeat = setInterval(() => { if (!closed) port.postMessage({type:'alive'}); }, 1500);
+        const timeout = setTimeout(() => stop('카메라 연결 시간이 초과되었습니다. 다시 요청해주세요.'), 120000);
+        session = {
+          stop: () => stop('카메라를 껐습니다.'),
+          facingMode: options.facingMode === 'user' ? 'user' : 'environment',
+          torch: null,
+          setTorch(on) {
+            if (closed) return Promise.reject(fail('카메라가 꺼져 있습니다.'));
+            const id = ++torchSeq;
+            return new Promise((resolve, reject) => {
+              torchWaits.set(id, {resolve, reject});
+              port.postMessage({type:'torch', id, on: !!on});
+            });
+          }
+        };
+        current = session;
+        port.onmessage = async event => {
+          const data = event.data || {};
+          if (closed) return;
+          if (data.type === 'stopped' || data.type === 'error') { stop(data.message, false); return; }
+          if (data.type === 'torch-result') {
+            const w = torchWaits.get(data.id); if (!w) return; torchWaits.delete(data.id);
+            if (data.ok) w.resolve(true); else w.reject(new DOMException(data.message || '손전등을 제어할 수 없습니다.', 'NotSupportedError'));
+            return;
+          }
+          if (data.type === 'started') {
+            session.facingMode = data.facingMode; session.torch = data.torch;
+            if (!wantFrames && !settled) { settled = true; clearTimeout(timeout); resolveStart(session); }
+            return;
+          }
+          if (data.type !== 'frame' || !(data.bytes instanceof ArrayBuffer)) return;
+          try {
+            const img = new Image();
+            imageURL = URL.createObjectURL(new Blob([data.bytes], {type:'image/jpeg'}));
+            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = imageURL; });
+            if (closed) return;
+            if (options.onFrame) await options.onFrame(img);
+            if (!settled) { settled = true; clearTimeout(timeout); resolveStart(session); }
+            port.postMessage({type:'ready'});
+          } catch (_) { stop('카메라 영상을 읽을 수 없습니다. 다시 요청해주세요.'); }
+          finally { if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; } }
+        };
+        window.parent.postMessage({type:'real-physics-camera-v1', facingMode:session.facingMode, frames:wantFrames}, '*', [channel.port2]);
+        return result;
+      },
+      stop() { if (current) current.stop(); }
+    };
+    window.addEventListener('pagehide', () => window.rpCameraBridge.stop());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) window.rpCameraBridge.stop(); });
+  }
+  const visible = frame => !!(frame && frame.isConnected && frame.getClientRects().length && getComputedStyle(frame).visibility !== 'hidden');
+  function send(s, data) { try { s.port.postMessage(data); } catch (_) {} }
+  function stop(s, message = '카메라를 껐습니다.') {
+    if (!s || s.closed) return;
+    s.closed = true; clearInterval(s.timer);
+    if (s.stream) s.stream.getTracks().forEach(t => t.stop());
+    if (s.video) { s.video.pause(); s.video.srcObject = null; s.video.remove(); }
+    send(s, {type:'stopped', message}); s.port.close();
+    if (active === s) { active = null; if (prompt && prompt.open) prompt.close(); if (bar) bar.hidden = true; }
+  }
+  function ensureUI() {
+    if (prompt) return;
+    const style = document.createElement('style');
+    style.textContent = '#rp-camera-prompt{margin:auto;width:min(460px,calc(100vw - 32px));padding:24px;border:1px solid #b4c9dd;border-radius:14px;background:white;color:#1b2e44;font:16px/1.7 system-ui}#rp-camera-prompt::backdrop{background:#10213399}#rp-camera-prompt h2{font-size:20px;margin:0 0 12px}#rp-camera-prompt p{margin:12px 0}#rp-camera-prompt button,#rp-camera-bar button{padding:12px;border:1px solid #a9bdd0;border-radius:8px;background:white;color:#183751;cursor:pointer;font:600 14px system-ui}#rp-camera-allow{background:#1767df!important;color:white!important}#rp-camera-bar{position:fixed;top:12px;right:12px;z-index:2147483647;max-width:calc(100vw - 24px);display:flex;gap:12px;align-items:center;padding:10px;background:white;color:#912b39;border:2px solid #c9495c;border-radius:12px;font:600 14px system-ui}#rp-camera-bar[hidden]{display:none}';
+    document.head.appendChild(style);
+    prompt = document.createElement('dialog'); prompt.id = 'rp-camera-prompt';
+    prompt.setAttribute('aria-labelledby','rp-camera-title');
+    prompt.innerHTML = '<h2 id="rp-camera-title">이 실험에서 카메라를 사용할까요?</h2><p id="rp-camera-context"></p><p id="rp-camera-desc">선택한 실험 코드에 실시간 카메라 영상을 전달합니다. 신뢰하는 실험에서만 허용해주세요. 연결 기능 자체는 영상을 서버에 저장하지 않지만, 실험 코드는 영상을 처리하거나 외부로 보낼 수 있습니다.</p><p>브라우저가 카메라 권한을 물으면 직접 허용해주세요. 마이크는 켜지지 않습니다.</p><p id="rp-camera-feedback" role="status"></p><div style="display:flex;gap:12px;justify-content:flex-end"><button id="rp-camera-deny" autofocus>취소</button><button id="rp-camera-allow">동의하고 카메라 켜기</button></div>';
+    document.body.appendChild(prompt);
+    bar = document.createElement('div'); bar.id = 'rp-camera-bar'; bar.hidden = true;
+    bar.innerHTML = '<span role="status">실험에 카메라 영상 전달 중</span><button type="button">카메라 끄기</button>';
+    document.body.appendChild(bar); bar.querySelector('button').onclick = () => stop(active);
+    document.getElementById('rp-camera-deny').onclick = () => { stop(active, '카메라 요청을 취소했습니다.'); prompt.close(); };
+    prompt.addEventListener('cancel', event => { event.preventDefault(); stop(active, '카메라 요청을 취소했습니다.'); prompt.close(); });
+    document.getElementById('rp-camera-allow').onclick = async function () {
+      const s = active; if (!s || s.closed || s.starting) return;
+      s.starting = true; this.disabled = true;
+      document.getElementById('rp-camera-feedback').textContent = '카메라 권한을 확인하고 있습니다…';
+      try {
+        if (!isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('카메라는 HTTPS 웹사이트에서 사용할 수 있습니다.');
+        const stream = await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:s.facingMode},width:{ideal:960},height:{ideal:720},frameRate:{ideal:24,max:30}}});
+        if (s.closed || active !== s || !visible(s.frame) || document.hidden) { stream.getTracks().forEach(t => t.stop()); stop(s); return; }
+        s.stream = stream; s.video = document.createElement('video');
+        s.video.muted = true; s.video.autoplay = true; s.video.playsInline = true;
+        s.video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none';
+        document.body.appendChild(s.video); s.video.srcObject = stream; await s.video.play();
+        if (s.closed) return;
+        s.canvas = document.createElement('canvas'); s.context = s.canvas.getContext('2d');
+        const track = stream.getVideoTracks()[0];
+        s.track = track;
+        s.facingMode = track.getSettings().facingMode || s.facingMode;
+        track.addEventListener('ended', () => stop(s,'카메라 연결이 종료되었습니다.'));
+        const caps = track.getCapabilities ? track.getCapabilities() : {};
+        send(s,{type:'started',facingMode:s.facingMode,torch:('torch' in caps) ? !!caps.torch : null});
+        s.ready = true; s.lastAck = Date.now(); prompt.close(); bar.hidden = false;
+        bar.querySelector('span').textContent = s.torchOnly ? '실험에서 손전등 제어 중' : '실험에 카메라 영상 전달 중';
+        if (s.torchOnly) return;
+        s.timer = setInterval(async () => {
+          if (s.closed || !s.ready || s.encoding || s.video.readyState < 2) return;
+          s.encoding = true; s.ready = false; s.lastAck = Date.now();
+          try {
+            const scale = Math.min(1,960 / Math.max(s.video.videoWidth,s.video.videoHeight));
+            const w = Math.max(1,Math.round(s.video.videoWidth*scale)), h = Math.max(1,Math.round(s.video.videoHeight*scale));
+            if (s.canvas.width !== w || s.canvas.height !== h) { s.canvas.width=w; s.canvas.height=h; }
+            s.context.drawImage(s.video,0,0,w,h);
+            const blob = await new Promise(resolve => s.canvas.toBlob(resolve,'image/jpeg',.85));
+            if (!blob) throw new Error('빈 영상');
+            const bytes = await blob.arrayBuffer();
+            if (!s.closed) s.port.postMessage({type:'frame',bytes},[bytes]);
+          } catch (_) { stop(s,'카메라 영상 전달에 실패했습니다. 다시 켜주세요.'); }
+          finally { s.encoding=false; }
+        }, 50);
+      } catch (error) {
+        const message = error.name === 'NotAllowedError' ? '카메라가 허용되지 않았습니다. 사이트 권한을 확인한 뒤 다시 요청해주세요.' : error.name === 'NotFoundError' ? '사용할 수 있는 카메라가 없습니다.' : error.message || '카메라를 열 수 없습니다.';
+        stop(s,message);
+        document.getElementById('rp-camera-feedback').textContent = message;
+        if (!prompt.open) prompt.showModal();
+      }
+    };
+  }
+  window.addEventListener('message', event => {
+    if (event.data?.type !== 'real-physics-camera-v1' || event.ports.length !== 1) return;
+    const frame = ids.map(id => document.getElementById(id)).find(f => f && f.contentWindow === event.source);
+    const port = event.ports[0];
+    if (!visible(frame) || document.hidden) { port.close(); return; }
+    if (active) { try { port.postMessage({type:'error',message:'다른 카메라 요청이나 사용을 먼저 종료해주세요.'}); } finally { port.close(); } return; }
+    const s = {frame,port,closed:false,starting:false,lastAlive:Date.now(),requested:Date.now(),facingMode:event.data.facingMode === 'user' ? 'user' : 'environment',torchOnly:event.data.frames === false};
+    active=s; ensureUI();
+    port.onmessage = async event => {
+      const d = event.data || {};
+      if (d.type === 'stop') stop(s);
+      if (d.type === 'alive') { s.lastAlive=Date.now(); if (s.torchOnly) s.lastAck=Date.now(); }
+      if (d.type === 'ready') { s.ready=true; s.lastAck=Date.now(); }
+      if (d.type === 'torch') {
+        if (s.closed) return;
+        if (!s.track) { send(s,{type:'torch-result',id:d.id,ok:false,message:'카메라가 아직 켜지지 않았습니다.'}); return; }
+        if (!visible(s.frame) || document.hidden) { stop(s,'실험 화면이 보이지 않아 카메라를 껐습니다.'); return; }
+        try { await s.track.applyConstraints({advanced:[{torch:!!d.on}]}); send(s,{type:'torch-result',id:d.id,ok:true}); }
+        catch (error) { send(s,{type:'torch-result',id:d.id,ok:false,message:'이 기기나 브라우저에서는 손전등을 제어할 수 없습니다. ('+(error.name||'오류')+')'}); }
+      }
+    };
+    document.getElementById('rp-camera-context').textContent = frame.id === 'modal-frame' ? (document.getElementById('mttl')?.textContent || '현재 실험') : '현재 실행 중인 실험';
+    document.getElementById('rp-camera-title').textContent = s.torchOnly ? '이 실험에서 손전등(플래시)을 사용할까요?' : '이 실험에서 카메라를 사용할까요?';
+    document.getElementById('rp-camera-desc').textContent = s.torchOnly
+      ? '휴대폰 손전등은 후면 카메라에 연결되어 있어 카메라를 켜야 제어할 수 있습니다. 이 실험에는 카메라 영상을 전달하지 않고, 손전등 켜기·끄기 명령만 전달합니다. 손전등이 빠르게 깜박일 수 있으니 빛 깜박임에 민감한 사람이 있다면 허용하지 마세요.'
+      : '선택한 실험 코드에 실시간 카메라 영상을 전달합니다. 신뢰하는 실험에서만 허용해주세요. 연결 기능 자체는 영상을 서버에 저장하지 않지만, 실험 코드는 영상을 처리하거나 외부로 보낼 수 있습니다.';
+    document.getElementById('rp-camera-feedback').textContent='';
+    document.getElementById('rp-camera-allow').disabled=false; prompt.showModal();
+  });
+  setInterval(() => {
+    const s=active; if (!s) return;
+    if (!visible(s.frame) || Date.now()-s.lastAlive>15000 || (!s.stream && Date.now()-s.requested>120000) || (s.stream && Date.now()-s.lastAck>15000)) stop(s,'실험 연결이 종료되어 카메라를 껐습니다.');
+  },500);
+  window.addEventListener('pagehide',()=>stop(active));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop(active);});
+  const previousStop=window.rpStopExperimentMicrophone;
+  window.rpStopExperimentMicrophone=function(frame){previousStop(frame);if(active&&(!frame||active.frame===frame))stop(active);};
+  const previousInject=window.rpAddMicrophoneBridge;
+  window.rpAddMicrophoneBridge=function(html){
+    const script='<script>('+childCameraBridge.toString()+')();<\/script>';
+    const withCamera=/<head\b[^>]*>/i.test(html)?html.replace(/<head\b[^>]*>/i,head=>head+script):script+html;
+    return previousInject(withCamera);
+  };
+})();
+
+</script>
+<script>
+const RP_LIVE_DEPTH_WORKER="let estimator;\nself.onmessage = async ({data}) => {\n  try {\n    self.postMessage({type:'progress',text:'깊이 분석 도구를 준비하고 있습니다…'});\n    const {pipeline, RawImage, env} = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js');\n    env.allowLocalModels=false;\n    env.useBrowserCache=false;\n    env.backends.onnx.wasm.numThreads=1;\n    env.backends.onnx.wasm.proxy=false;\n    if(!estimator) estimator=await pipeline('depth-estimation','onnx-community/depth-anything-v2-small',{\n      device:'wasm',dtype:'q8',\n      progress_callback(p){if(p.status==='progress')self.postMessage({type:'progress',text:'분석 모델 내려받는 중 · '+Math.round(p.progress||0)+'%'});}\n    });\n    self.postMessage({type:'progress',text:'장면의 앞뒤 거리를 분석하고 있습니다…'});\n    const input=new RawImage(new Uint8ClampedArray(data.pixels),data.width,data.height,4);\n    const processor=estimator.processor.image_processor || estimator.processor;\n    processor.size={width:266,height:266};\n    const result=await estimator(input);\n    const tensor=result.predicted_depth, values=tensor.data;\n    const height=tensor.dims[tensor.dims.length-2],width=tensor.dims[tensor.dims.length-1];\n    let low=Infinity,high=-Infinity;\n    for(const value of values){if(Number.isFinite(value)){low=Math.min(low,value);high=Math.max(high,value);}}\n    if(!Number.isFinite(low)||high-low<1e-6)throw new Error('장면의 깊이 차이를 찾지 못했습니다. 앞뒤로 떨어진 물체를 비춰주세요.');\n    // This model predicts relative inverse depth: larger values mean nearer.\n    const pixels=new Uint8Array(width*height);\n    for(let i=0;i<pixels.length;i++)pixels[i]=Math.round(255*Math.max(0,Math.min(1,(values[i]-low)/(high-low))));\n    self.postMessage({type:'result',pixels,width,height},[pixels.buffer]);\n  }catch(error){self.postMessage({type:'error',text:error.message||'깊이를 분석하지 못했습니다.'});}\n};\n";
+/* Dedicated depth worker owned by the host, not by an opaque sandbox. */
+(function(){
+  const frameIds=['preview-frame','modal-frame','fs-frame','kiosk-frame'];
+  let session=null;
+  const visible=f=>f&&f.isConnected&&f.getClientRects().length&&!document.hidden;
+  function close(s,text='깊이 분석 연결을 종료했습니다.'){
+    if(!s||s.closed)return;s.closed=true;clearTimeout(s.timeout);
+    if(s.worker)s.worker.terminate();if(s.url)URL.revokeObjectURL(s.url);
+    try{s.port.postMessage({type:'closed',text});}catch(_){}s.port.close();if(session===s)session=null;
+  }
+  window.addEventListener('message',event=>{
+    if(event.data?.type!=='real-physics-depth-v1'||event.ports.length!==1)return;
+    const frame=frameIds.map(id=>document.getElementById(id)).find(f=>f&&f.contentWindow===event.source),port=event.ports[0];
+    if(!visible(frame)){port.close();return;}
+    if(session){port.postMessage({type:'closed',text:'다른 실험의 깊이 분석을 먼저 종료해주세요.'});port.close();return;}
+    const s={frame,port,closed:false,processing:false,lastAlive:Date.now(),lastJob:0};session=s;
+    port.onmessage=({data})=>{
+      if(s.closed)return;
+      if(data?.type==='close'){close(s);return;}
+      if(data?.type==='alive'){s.lastAlive=Date.now();return;}
+      if(data?.type!=='analyze')return;
+      if(!visible(frame)){close(s);return;}
+      if(s.processing){close(s,'겹치는 분석 요청을 중단했습니다.');return;}
+      if(!Number.isInteger(data.width)||!Number.isInteger(data.height)||data.width<1||data.height<1||data.width>512||data.height>512||!(data.pixels instanceof ArrayBuffer)||data.pixels.byteLength!==data.width*data.height*4){close(s,'분석 영상 형식이 올바르지 않습니다.');return;}
+      if(Date.now()-s.lastJob<250){close(s,'분석 요청이 너무 빠릅니다.');return;}
+      s.lastJob=Date.now();s.processing=true;
+      try{
+        if(!s.worker){
+          s.url=URL.createObjectURL(new Blob([RP_LIVE_DEPTH_WORKER],{type:'text/javascript'}));s.worker=new Worker(s.url,{type:'module'});
+          s.worker.onmessage=({data})=>{
+            if(s.closed)return;
+            if(data.type==='result'||data.type==='error'){s.processing=false;clearTimeout(s.timeout);}
+            if(!visible(s.frame)){close(s);return;}
+            try{s.port.postMessage(data,data.type==='result'?[data.pixels.buffer]:[]);}catch(_){close(s);}
+          };
+          s.worker.onerror=()=>close(s,'깊이 분석 도구를 실행할 수 없습니다. 최신 브라우저에서 다시 시도해주세요.');
+        }
+        s.timeout=setTimeout(()=>close(s,'분석 시간이 초과되었습니다. 다시 시작해주세요.'),180000);
+        s.worker.postMessage({pixels:data.pixels,width:data.width,height:data.height},[data.pixels]);
+      }catch(error){close(s,error.message);}
+    };
+    port.postMessage({type:'connected'});
+  });
+  setInterval(()=>{if(session&&(!visible(session.frame)||Date.now()-session.lastAlive>15000))close(session);},1000);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)close(session);});window.addEventListener('pagehide',()=>close(session));
+  const stopMedia=window.rpStopExperimentMicrophone;
+  window.rpStopExperimentMicrophone=function(frame){stopMedia(frame);if(session&&(!frame||session.frame===frame))close(session);};
+  function depthClient(){
+    let port=null,pending=null,beat=null;
+    function reset(reason='깊이 분석을 중단했습니다.'){
+      clearInterval(beat);if(port){try{port.postMessage({type:'close'});}catch(_){}port.close();port=null;}
+      if(pending){const p=pending;pending=null;clearTimeout(p.timeout);p.reject(Error(reason));}
+    }
+    window.rpDepthBridge={
+      analyze(data,progress){
+        if(pending)return Promise.reject(Error('이미 깊이 분석 중입니다.'));
+        return new Promise((resolve,reject)=>{
+          pending={resolve,reject,progress,timeout:setTimeout(()=>reset('홈페이지의 실시간 분석 연결을 확인해주세요.'),180000)};
+          function submit(){if(port&&pending)port.postMessage({type:'analyze',...data},[data.pixels]);}
+          if(port){submit();return;}
+          const channel=new MessageChannel();port=channel.port1;
+          port.onmessage=({data})=>{
+            if(data.type==='connected'){submit();return;}
+            if(data.type==='closed'){reset(data.text);return;}
+            if(!pending)return;
+            if(data.type==='progress'){if(pending.progress)pending.progress(data);return;}
+            if(data.type==='result'||data.type==='error'){
+              const p=pending;pending=null;clearTimeout(p.timeout);
+              if(data.type==='error')p.reject(Error(data.text));else p.resolve(data);
+            }
+          };
+          beat=setInterval(()=>{if(port)port.postMessage({type:'alive'});},1500);
+          window.parent.postMessage({type:'real-physics-depth-v1'},'*',[channel.port2]);
+        });
+      },reset
+    };
+    window.addEventListener('pagehide',()=>reset());
+  }
+  const inject=window.rpAddMicrophoneBridge;
+  window.rpAddMicrophoneBridge=function(html){
+    const script='<script>('+depthClient.toString()+')();<\/script>';
+    return inject(/<head\b[^>]*>/i.test(html)?html.replace(/<head\b[^>]*>/i,h=>h+script):script+html);
   };
 })();
 
@@ -3083,7 +3159,7 @@ function initPreviewResizer() {
 (function showBuildMarker(){
   function ready(){
     var el = document.createElement("div");
-    el.textContent = "build 2026-10-15 · MIC-02 · CAM-01";
+    el.textContent = "build 2026-06-08-device-text-v12 · MIC-02 · CAM-01 · LIVE-01";
     el.style.cssText = "position:fixed;left:8px;bottom:6px;z-index:99999;font:10px monospace;color:rgba(136,146,164,.5);pointer-events:none";
     document.body.appendChild(el);
   }
